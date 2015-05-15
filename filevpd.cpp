@@ -63,12 +63,13 @@ bool FileVpd::store(const uint8_t *vpdData, int size)
 
 	uint8_t *p = new uint8_t[size];
 	memcpy(p, vpdData+4, size-4);
-    for (int n=0; n < size-4; n++, p++)
+    for (int n=0; n < size-4; n++)
     {
         if (p[n]== '\0')
             p[n]= '\n';
     }
-    fwrite(vpdData+4, 1, size-4, _vpdFile);
+    fwrite(p, 1, size-4, _vpdFile);
+    delete[] p;
     fclose(_vpdFile);
     return true;
 }

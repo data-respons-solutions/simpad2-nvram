@@ -1,6 +1,7 @@
 #include "common.h"
 #include "filevpd.h"
 #include "vpd.h"
+#include "MtdVpd.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <iostream>
@@ -14,18 +15,14 @@
 void usage(void)
 {
 	std::cout << "nvram, EEPROM tool (C) DATA RESPONS AS" << std::endl;
-	std::cout << "Usage:  nvram [OPTION] COMMAND [KEY [VALUE]]" << std::endl;
-	std::cout << "Options:" << std::endl;
-	std::cout << "\t--help, -h\tDisplay help" << std::endl;
-	std::cout << "\t--quiet, -q\tQuiet output" << std::endl;
+	std::cout << "Usage:  nvram COMMAND [KEY [VALUE]]" << std::endl;
 	std::cout << "Commands:" << std::endl;
 	std::cout << "\tset KEY VALUE\tAssign VALUE to KEY in nvram." << std::endl << "\t\t\tAdd entry if not exist" << std::endl;
 	std::cout << "\tget KEY\t\tRead contents of KEY to stdout" << std::endl;
 	std::cout << "\tdelete KEY\tDelete the entry given by KEY" << std::endl;
 	std::cout << "\tkeys\t\tList all keys to stdout" << std::endl;
-
 	std::cout << "\tlist\t\tList all keys and values to stdout" << std::endl;
-	std::cout << "\tinit\t\tInitialise config. Config will be empty afterwards." << std::endl;
+	std::cout << "\tinit\t\tClears all but immutable keys" << std::endl;
 }
 
 int main(int argc, char *argv[])
@@ -36,34 +33,26 @@ int main(int argc, char *argv[])
 		std::string str(argv[n]);
 		argvList.push_back(str);
 	}
-#if TARGET_TYPE == DESKTOP
+
+	VpdStorage *vpdStorage;
+#if defined(TARGET_DESKTOP) || defined(TARGET_LMPLUS)
 	char *vpdPath = getenv("VPDFILE");
 	std::string vpdString = vpdPath ? vpdPath : "/var/lib/vpddata";
-    VpdStorage *vpdStorage = new FileVpd(vpdString);
-#else
-#if TARGET_TYPE == GEN2
-    VpdStorage *vpdStorage = new MtdVpd("/dev/mtd2", 0x10000);
-#endif
+    vpdStorage = new FileVpd(vpdString);
 #endif
 
 
     int imageSize;
     uint8_t *image = vpdStorage->load(imageSize);
-    if (image == 0)
-    {
-        std::cout << "No VPD object\n";
-        delete vpdStorage;
-        return -1;
-    }
     VPD vpd(image, imageSize);
 
-    if (argvList.empty() || argvList.front() == "list")
+    if (image && (argvList.empty() || argvList.front() == "list"))
     {
     	vpd.list();
     	return 0;
     }
 
-    if (argvList.front() == "get")
+    if (image && argvList.front() == "get")
     {
     	if (argvList.size() < 2)
     	{
@@ -99,7 +88,7 @@ int main(int argc, char *argv[])
     	goto cleanexit;
     }
 
-    if (argvList.front() == "delete")
+    if (image && argvList.front() == "delete")
     {
     	if (argvList.size() < 2)
     	{
@@ -109,12 +98,24 @@ int main(int argc, char *argv[])
     	argvList.pop_front();
     	if (!vpd.deleteKey(argvList.front()))
     	{
-    		std::cerr << "No key [" << argvList.front() << "] found\n";
+    		std::cerr << "Key [" << argvList.front() << "] could not be erased\n";
     		return -1;
     	}
     	else
     		goto cleanexit;
     }
+
+    if (image && argvList.front() == "keys")
+	{
+    	vpd.keys();
+    	goto cleanexit;
+	}
+
+    if (argvList.front() == "init")
+	{
+		vpd.init();
+		goto cleanexit;
+	}
 
     usage();
     return -1;

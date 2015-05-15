@@ -3,6 +3,7 @@
 #include <map>
 #include <stdint.h>
 #include <string>
+#include <list>
 
 typedef std::map<std::string, std::string> KeyMap;
 
@@ -15,20 +16,23 @@ public:
 
 public:
     int parseImage();
-    bool insert(const std::string& key, const std::string& value);
     void list();
+    void keys();
     bool lookup(const std::string& key, std::string& value);
-    bool insert(const std::string& key, std::string& value);
+    bool insert(const std::string& key, const std::string& value);
     bool deleteKey(const std::string& key);
     uint8_t *getImage(int& size);
+    void init();
 private:
     bool keyOk(const std::string& key);
+    bool keyImmutable(const std::string& key);
     bool prepareWrite();
     KeyMap _map;
     bool _modified;
     uint8_t *_imageOut;
     int _imageOutSize;
     const int _cMaxSize=0x100000;
+    std::list<std::string> _immutables;
 };
 
 #endif // VPD_H
