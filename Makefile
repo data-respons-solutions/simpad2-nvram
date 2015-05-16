@@ -1,28 +1,21 @@
 
 CXX ?= g++
 
-PREFIX ?= /usr/local
-
-LIBS := -luuid
+PREFIX ?= /usr
 
 
 TARGET_TYPE ?= TARGET_LMPLUS
 
-ifeq ($(TARGET_TYPE),TARGET_LMPLUS)
-	CXXFLAGS += -march=armv7-a -mfloat-abi=hard -mfpu=neon -mtune=cortex-a9 --sysroot=/opt/poky/1.8/sysroots/cortexa9hf-vfp-neon-poky-linux-gnueabi
-	LDFLAGS += -march=armv7-a -mfloat-abi=hard -mfpu=neon -mtune=cortex-a9 --sysroot=/opt/poky/1.8/sysroots/cortexa9hf-vfp-neon-poky-linux-gnueabi
-endif
+CXXFLAGS += -D$(TARGET_TYPE) -std=c++11
 
-CXXFLAGS += -D$(TARGET_TYPE)
-WP_GPIO ?= -1
-CXXFLAGS += -g -O0 -DWP_GPIO=$(WP_GPIO) -std=c++11
+COMMON_OBJS := crc32.o common.o filevpd.o vpd.o eeprom_vpd.o nvram.o
 
-COMMON_OBJS := crc32.o common.o filevpd.o vpd.o MtdVpd.o
+$(COMMON_OBJS): vpd.h filevpd.h eeprom_vpd.h Makefile
 
 all: nvram
 
-nvram : $(COMMON_OBJS) Makefile nvram.o
-	$(CXX) $(CXXFLAGS) -g -o nvram nvram.o $(COMMON_OBJS) $(LDFLAGS) $(LIBS)
+nvram : $(COMMON_OBJS) Makefile
+	$(CXX) -o nvram  $(COMMON_OBJS) $(LDFLAGS)
 
 install:
 	install -m 0755 -D nvram $(PREFIX)/bin/nvram

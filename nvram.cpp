@@ -1,16 +1,15 @@
 #include "common.h"
 #include "filevpd.h"
 #include "vpd.h"
-#include "MtdVpd.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <iostream>
 #include <list>
+#include "eeprom_vpd.h"
 
-#ifdef TARGET_DESKTOP
-#define VPD_SIZE 0x800
-#endif
+#define EEPROM_SIZE 0x800
 
+static const std::string initFile = "/nvram/factory/vpd";
 
 void usage(void)
 {
@@ -34,25 +33,49 @@ int main(int argc, char *argv[])
 		argvList.push_back(str);
 	}
 
+	VPD vpd;
 	VpdStorage *vpdStorage;
-#if defined(TARGET_DESKTOP) || defined(TARGET_LMPLUS)
-	char *vpdPath = getenv("VPDFILE");
-	std::string vpdString = vpdPath ? vpdPath : "/var/lib/vpddata";
+#if defined(TARGET_LEGACY)
+	const std::string eepromInitialPath = "/sys/bus/i2c/devices";
+	char *gpio = getenv("VPD_GPIO");
+	int gpio_nr = gpio ? atoi(gpio) ? -1;
+	vpdStorage = new EepromVpd(findEEprom(eepromInitialPath), EEPROM_SIZE, gpio_nr);
+#else
+	char *vpdPathFactory = getenv("VPD_FACTORY");
+	char *vpdPathUser = getenv("VPD_USER");
+
+	if (vpdPathFactory)
+	{
+		VpdStorage *fact = new FileVpd(vpdPathFactory);
+		if (!vpd.load(fact))
+		{
+			delete fact;
+			return -1;
+		}
+		delete fact;
+	}
+
+	std::string vpdString = vpdPathUser ? vpdPathUser : "/nvram/user/vpd";
     vpdStorage = new FileVpd(vpdString);
 #endif
 
+    bool status = vpd.load(vpdStorage);
+    if (!status)
+    {
+    	if (argvList.empty() || argvList.front() != "init")
+    	{
+    		usage();
+    		return -1;
+    	}
+    }
 
-    int imageSize;
-    uint8_t *image = vpdStorage->load(imageSize);
-    VPD vpd(image, imageSize);
-
-    if (image && (argvList.empty() || argvList.front() == "list"))
+    if (argvList.empty() || argvList.front() == "list")
     {
     	vpd.list();
     	return 0;
     }
 
-    if (image && argvList.front() == "get")
+    if (argvList.front() == "get")
     {
     	if (argvList.size() < 2)
     	{
@@ -88,7 +111,7 @@ int main(int argc, char *argv[])
     	goto cleanexit;
     }
 
-    if (image && argvList.front() == "delete")
+    if (argvList.front() == "delete")
     {
     	if (argvList.size() < 2)
     	{
@@ -105,7 +128,7 @@ int main(int argc, char *argv[])
     		goto cleanexit;
     }
 
-    if (image && argvList.front() == "keys")
+    if (argvList.front() == "keys")
 	{
     	vpd.keys();
     	goto cleanexit;
@@ -113,7 +136,7 @@ int main(int argc, char *argv[])
 
     if (argvList.front() == "init")
 	{
-		vpd.init();
+    	vpd.init();
 		goto cleanexit;
 	}
 
@@ -122,11 +145,9 @@ int main(int argc, char *argv[])
 
 cleanexit:
     if (vpd.isModified())
-    {
-    	int size;
-        uint8_t *modImage = vpd.getImage(size);
-        vpdStorage->store(modImage, size);
-    }
+        vpd.store(vpdStorage);
+    delete vpdStorage;
+
     return 0;
 }
 
