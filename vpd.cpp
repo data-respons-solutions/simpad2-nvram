@@ -29,7 +29,7 @@ bool VPD::load(VpdStorage *st)
 	{
 		int pos = it->find_first_of('=');
 		if ( pos == 0 || pos == std::string::npos)
-			std::cerr << "Malformed line " << *it << std::endl;
+			std::cerr << "VPD::load: Malformed line " << *it << std::endl;
 		else
 		{
 			std::string key = it->substr(0, pos);
@@ -50,8 +50,11 @@ bool VPD::store(VpdStorage* st)
 	KeyMap::const_iterator it = _map.cbegin();
 	while (it != _map.cend())
 	{
-		std::string s = it->first + "=" + it->second;
-		sList.push_back(s);
+		if (!keyImmutable(it->first))
+		{
+			std::string s = it->first + "=" + it->second;
+			sList.push_back(s);
+		}
 		it++;
 	}
 	return st->store(sList);

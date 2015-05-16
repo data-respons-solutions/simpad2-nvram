@@ -41,8 +41,11 @@ int main(int argc, char *argv[])
 	int gpio_nr = gpio ? atoi(gpio) ? -1;
 	vpdStorage = new EepromVpd(findEEprom(eepromInitialPath), EEPROM_SIZE, gpio_nr);
 #else
-	char *vpdPathFactory = getenv("VPD_FACTORY");
-	char *vpdPathUser = getenv("VPD_USER");
+	const char *vpdPathFactory = getenv("VPD_FACTORY");
+	if (!vpdPathFactory)
+		vpdPathFactory = "/nvram/factory/vpd";
+
+
 
 	if (vpdPathFactory)
 	{
@@ -55,8 +58,11 @@ int main(int argc, char *argv[])
 		delete fact;
 	}
 
-	std::string vpdString = vpdPathUser ? vpdPathUser : "/nvram/user/vpd";
-    vpdStorage = new FileVpd(vpdString);
+	const char *vpdPathUser = getenv("VPD_USER");
+	if (!vpdPathUser)
+		vpdPathUser = "/nvram/user/vpd";
+
+    vpdStorage = new FileVpd(vpdPathUser);
 #endif
 
     bool status = vpd.load(vpdStorage);
