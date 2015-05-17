@@ -4,21 +4,25 @@
 #include "crc32.h"
 
 
-VPD::VPD() :
-    _modified(false)
+VPD::VPD(bool legacyMode) :
+    _modified(false),
+	_legacyMode(legacyMode)
 {
-    _immutables.push_back("ETH_MAC_ADDR");
-    _immutables.push_back("HW_BOARD_REVISION");
-    _immutables.push_back("LM_PRODUCT_DATE");
-    _immutables.push_back("LM_PRODUCT_ID");
-    _immutables.push_back("LM_PRODUC_SERIAL");
+	if (legacyMode)
+	{
+		_immutables.push_back("ETH_MAC_ADDR");
+		_immutables.push_back("HW_BOARD_REVISION");
+		_immutables.push_back("LM_PRODUCT_DATE");
+		_immutables.push_back("LM_PRODUCT_ID");
+		_immutables.push_back("LM_PRODUC_SERIAL");
+	}
 }
 
 VPD::~VPD()
 {
 }
 
-bool VPD::load(VpdStorage *st)
+bool VPD::load(VpdStorage *st, bool immutables)
 {
 	std::list<std::string> sList;
 	if ( !st->load(sList))
@@ -37,6 +41,8 @@ bool VPD::load(VpdStorage *st)
 			{
 				std::string value = it->substr(pos+1);
 				insert(key, value);
+				if (immutables)
+					_immutables.push_back(key);
 			}
 		}
 		it++;
@@ -50,7 +56,7 @@ bool VPD::store(VpdStorage* st)
 	KeyMap::const_iterator it = _map.cbegin();
 	while (it != _map.cend())
 	{
-		if (!keyImmutable(it->first))
+		if (_legacyMode || (!_legacyMode && !keyImmutable(it->first)))
 		{
 			std::string s = it->first + "=" + it->second;
 			sList.push_back(s);

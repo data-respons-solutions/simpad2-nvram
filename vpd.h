@@ -12,7 +12,7 @@ typedef std::map<std::string, std::string> KeyMap;
 class VPD
 {
 public:
-    explicit VPD();
+    explicit VPD(bool legacyMode=false);
     ~VPD();
     bool isModified() { return _modified; }
 
@@ -24,7 +24,7 @@ public:
     bool deleteKey(const std::string& key);
     uint8_t *getImage(int& size);
     void init(VpdStorage *st=0);
-    bool load(VpdStorage *st);
+    bool load(VpdStorage *st, bool immutables=false);
     bool store(VpdStorage *st);
 private:
     bool keyOk(const std::string& key);
@@ -32,6 +32,7 @@ private:
 
     KeyMap _map;
     bool _modified;
+    bool _legacyMode;
     std::list<std::string> _immutables;
 };
 

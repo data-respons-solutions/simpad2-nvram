@@ -33,14 +33,16 @@ int main(int argc, char *argv[])
 		argvList.push_back(str);
 	}
 
-	VPD vpd;
+
 	VpdStorage *vpdStorage;
 #if defined(TARGET_LEGACY)
+	VPD vpd(true);
 	const std::string eepromInitialPath = "/sys/bus/i2c/devices";
 	char *gpio = getenv("VPD_GPIO");
 	int gpio_nr = gpio ? atoi(gpio) ? -1;
 	vpdStorage = new EepromVpd(findEEprom(eepromInitialPath), EEPROM_SIZE, gpio_nr);
 #else
+	VPD vpd;
 	const char *vpdPathFactory = getenv("VPD_FACTORY");
 	if (!vpdPathFactory)
 		vpdPathFactory = "/nvram/factory/vpd";
@@ -50,7 +52,7 @@ int main(int argc, char *argv[])
 	if (vpdPathFactory)
 	{
 		VpdStorage *fact = new FileVpd(vpdPathFactory);
-		if (!vpd.load(fact))
+		if (!vpd.load(fact, true))
 		{
 			delete fact;
 			return -1;
