@@ -6,6 +6,7 @@
 #include <iostream>
 #include <list>
 #include "eeprom_vpd.h"
+#include <syslog.h>
 
 #define EEPROM_SIZE 0x800
 
@@ -26,7 +27,9 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
+	int ret=0;
 	std::list<std::string> argvList;
+	openlog("nvram", 0, LOG_USER);
 	for (int n=1; n < argc; n++)
 	{
 		std::string str(argv[n]);
@@ -53,10 +56,7 @@ int main(int argc, char *argv[])
 	{
 		VpdStorage *fact = new FileVpd(vpdPathFactory);
 		if (!vpd.load(fact, true))
-		{
-			delete fact;
-			return -1;
-		}
+			syslog(LOG_WARNING, "No factory VPD data in %s\n", vpdPathFactory);
 		delete fact;
 	}
 
@@ -72,15 +72,15 @@ int main(int argc, char *argv[])
     {
     	if (argvList.empty() || argvList.front() != "init")
     	{
-    		usage();
-    		return -1;
+    		syslog(LOG_INFO, "VPD User file %s will be initialized\n", vpdPathUser);
+    		vpd.init();
     	}
     }
 
     if (argvList.empty() || argvList.front() == "list")
     {
     	vpd.list();
-    	return 0;
+    	goto cleanexit;
     }
 
     if (argvList.front() == "get")
@@ -88,17 +88,15 @@ int main(int argc, char *argv[])
     	if (argvList.size() < 2)
     	{
     		usage();
-    		return -1;
+    		goto cleanexit;
     	}
     	std::string value;
     	argvList.pop_front();
     	if (vpd.lookup(argvList.front(), value))
-    	{
     		std::cout << value << std::endl;
-    		return 0;
-    	}
-    	std::cerr << "KEY [" << argvList.front() << "] not found\n";
-    	return -1;
+    	else
+    		ret = -1;
+    	goto cleanexit;
     }
 
     if (argvList.front() == "set")
@@ -106,7 +104,8 @@ int main(int argc, char *argv[])
     	if (argvList.size() < 3)
     	{
     		usage();
-    		return -1;
+    		ret = -1;
+    		goto cleanexit;
     	}
     	argvList.pop_front();
     	std::string key = argvList.front();
@@ -114,7 +113,7 @@ int main(int argc, char *argv[])
     	if (!vpd.insert(key, argvList.front()))
     	{
     		std::cerr << "Unable to insert key [" << key << "]\n";
-    		return -1;
+    		ret = -1;
     	}
     	goto cleanexit;
     }
@@ -124,16 +123,16 @@ int main(int argc, char *argv[])
     	if (argvList.size() < 2)
     	{
     		usage();
-    		return -1;
+    		ret = -1;
+    		goto cleanexit;
     	}
     	argvList.pop_front();
     	if (!vpd.deleteKey(argvList.front()))
     	{
     		std::cerr << "Key [" << argvList.front() << "] could not be erased\n";
-    		return -1;
+    		ret = -1;
     	}
-    	else
-    		goto cleanexit;
+    	goto cleanexit;
     }
 
     if (argvList.front() == "keys")
@@ -149,13 +148,13 @@ int main(int argc, char *argv[])
 	}
 
     usage();
-    return -1;
+    ret = -1;
 
 cleanexit:
     if (vpd.isModified())
         vpd.store(vpdStorage);
     delete vpdStorage;
-
-    return 0;
+    closelog();
+    return ret;
 }
 

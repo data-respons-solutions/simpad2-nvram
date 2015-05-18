@@ -23,7 +23,6 @@ bool FileVpd::load(std::list<std::string>& sList)
 	std::ifstream is(_filePath);
 	if (!is.is_open())
 	{
-		std::cerr << "FileVPD::load: Unable to open " << _filePath << std::endl;
 		return false;
 	}
 
@@ -45,7 +44,6 @@ bool FileVpd::store(const std::list<std::string>& strings)
 	std::ofstream os(_filePath);
 	if (!os.is_open())
 	{
-		std::cerr << "FileVPD::load: Unable to open " << _filePath << std::endl;
 		return false;
 	}
 

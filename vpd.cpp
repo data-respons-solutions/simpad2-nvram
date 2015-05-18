@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string.h>
+#include <syslog.h>
 #include "vpd.h"
 #include "crc32.h"
 
@@ -26,14 +27,17 @@ bool VPD::load(VpdStorage *st, bool immutables)
 {
 	std::list<std::string> sList;
 	if ( !st->load(sList))
+	{
+		syslog(LOG_WARNING, "VPD::load: unable to load file\n");
 		return false;
+	}
 
 	std::list<std::string>::const_iterator it = sList.cbegin();
 	while (it != sList.cend())
 	{
 		int pos = it->find_first_of('=');
 		if ( pos == 0 || pos == std::string::npos)
-			std::cerr << "VPD::load: Malformed line " << *it << std::endl;
+			syslog(LOG_WARNING, "VPD::load: Malformed line %s\n", it->c_str());
 		else
 		{
 			std::string key = it->substr(0, pos);
