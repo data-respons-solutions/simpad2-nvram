@@ -1,7 +1,7 @@
 
 CXX ?= g++
 
-PREFIX ?= /usr
+INSTALL_PATH ?= /usr/sbin
 
 
 TARGET_TYPE ?= TARGET_LMPLUS
@@ -18,7 +18,7 @@ nvram : $(COMMON_OBJS) Makefile
 	$(CXX) -o nvram  $(COMMON_OBJS) $(LDFLAGS)
 
 install:
-	install -m 0755 -D nvram $(PREFIX)/bin/nvram
+	install -m 0755 -D nvram $(INSTALL_PATH)/nvram
 
 clean:
 	rm -f *.o nvram
