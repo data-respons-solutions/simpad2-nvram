@@ -7,6 +7,7 @@
 #include <list>
 #include "eeprom_vpd.h"
 #include <syslog.h>
+#include <sys/stat.h>
 
 #define EEPROM_SIZE 0x800
 
@@ -36,46 +37,56 @@ int main(int argc, char *argv[])
 		argvList.push_back(str);
 	}
 
-
-	VpdStorage *vpdStorage;
+	VpdStorage *factoryStorage=0;
+	VpdStorage *userStorage=0;
 #if defined(TARGET_LEGACY)
 	VPD vpd(true);
 	const std::string eepromInitialPath = "/sys/bus/i2c/devices";
 	char *gpio = getenv("VPD_GPIO");
 	int gpio_nr = gpio ? atoi(gpio) ? -1;
-	vpdStorage = new EepromVpd(findEEprom(eepromInitialPath), EEPROM_SIZE, gpio_nr);
+	userStorage = new EepromVpd(findEEprom(eepromInitialPath), EEPROM_SIZE, gpio_nr);
 #else
 	VPD vpd;
 	const char *vpdPathFactory = getenv("VPD_FACTORY");
 	if (!vpdPathFactory)
 		vpdPathFactory = "/nvram/factory/vpd";
 
-
+	struct stat buf;
+	ret = stat(vpdPathFactory, &buf);
+	if (ret == 0 && !S_ISREG(buf.st_mode))
+	{
+		syslog(LOG_ERR, "Factory file path %s invalid - exiting \n", vpdPathFactory);
+		return -1;
+	}
 
 	if (vpdPathFactory)
 	{
-		VpdStorage *fact = new FileVpd(vpdPathFactory);
-		if (!vpd.load(fact, true))
-			syslog(LOG_WARNING, "No factory VPD data in %s\n", vpdPathFactory);
-		delete fact;
+		factoryStorage = new FileVpd(vpdPathFactory);
+		if (!vpd.load(factoryStorage, true))
+		{
+			syslog(LOG_WARNING, "No factory VPD data in %s - exiting \n", vpdPathFactory);
+			delete factoryStorage;
+			return -1;
+		}
 	}
 
 	const char *vpdPathUser = getenv("VPD_USER");
 	if (!vpdPathUser)
 		vpdPathUser = "/nvram/user/vpd";
 
-    vpdStorage = new FileVpd(vpdPathUser);
+	ret = stat(vpdPathUser, &buf);
+	if (ret == 0 && !S_ISREG(buf.st_mode))
+	{
+		syslog(LOG_ERR, "User file path %s not a regular file \n", vpdPathUser);
+		delete factoryStorage;
+		return -1;
+	}
+
+    userStorage = new FileVpd(vpdPathUser);
 #endif
 
-    bool status = vpd.load(vpdStorage);
-    if (!status)
-    {
-    	if (argvList.empty() || argvList.front() != "init")
-    	{
-    		syslog(LOG_INFO, "VPD User file %s will be initialized\n", vpdPathUser);
-    		vpd.init();
-    	}
-    }
+	vpd.load(userStorage);
+	ret = 0;
 
     if (argvList.empty() || argvList.front() == "list")
     {
@@ -152,8 +163,11 @@ int main(int argc, char *argv[])
 
 cleanexit:
     if (vpd.isModified())
-        vpd.store(vpdStorage);
-    delete vpdStorage;
+        vpd.store(userStorage);
+    if (factoryStorage)
+    	delete factoryStorage;
+    if (userStorage)
+    	delete userStorage;
     closelog();
     return ret;
 }

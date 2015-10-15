@@ -19,7 +19,9 @@ FileVpd::~FileVpd()
 bool FileVpd::load(std::list<std::string>& sList)
 {
 	char buf[256];
-
+	struct stat status;
+	if (stat(_filePath.c_str(), &status) < 0)
+		return true;
 	std::ifstream is(_filePath);
 	if (!is.is_open())
 	{

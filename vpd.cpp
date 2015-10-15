@@ -44,7 +44,7 @@ bool VPD::load(VpdStorage *st, bool immutables)
 			if (pos+1 != std::string::npos)
 			{
 				std::string value = it->substr(pos+1);
-				insert(key, value);
+				insert(key, value, false);
 				if (immutables)
 					_immutables.push_back(key);
 			}
@@ -105,7 +105,7 @@ bool VPD::keyOk(const std::string& key)
     return true;
 }
 
-bool VPD::insert(const std::string& key, const std::string& value)
+bool VPD::insert(const std::string& key, const std::string& value, bool modified)
 {
     if (keyOk(key))
     {
@@ -119,7 +119,7 @@ bool VPD::insert(const std::string& key, const std::string& value)
     		_map.insert(std::pair<std::string, std::string>(key,value));
     	else
     		_map[key] = value;
-    	_modified = true;
+    	_modified = modified;
         return true;
     }
     else

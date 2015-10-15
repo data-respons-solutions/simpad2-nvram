@@ -20,7 +20,7 @@ public:
     void list();
     void keys();
     bool lookup(const std::string& key, std::string& value);
-    bool insert(const std::string& key, const std::string& value);
+    bool insert(const std::string& key, const std::string& value, bool modified=true);
     bool deleteKey(const std::string& key);
     uint8_t *getImage(int& size);
     void init(VpdStorage *st=0);
