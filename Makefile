@@ -6,7 +6,7 @@ INSTALL_PATH ?= /usr/sbin
 
 TARGET_TYPE ?= TARGET_LMPLUS
 
-CXXFLAGS += -D$(TARGET_TYPE) -std=c++11
+CXXFLAGS += -D$(TARGET_TYPE) -std=c++11 -DVPD_EEPROM_PATH=$(VPD_EEPROM_PATH)
 
 COMMON_OBJS := crc32.o filevpd.o vpd.o eeprom_vpd.o nvram.o
 

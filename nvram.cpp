@@ -9,6 +9,15 @@
 
 #define EEPROM_SIZE 0x800
 
+#define XSTR(a) STRINGIFY(a)
+#define STRINGIFY(x) #x
+
+#ifdef VPD_EEPROM_PATH
+const char *vpd_eeprom_path = XSTR(VPD_EEPROM_PATH);
+#endif
+
+
+
 static const std::string initFile = "/nvram/factory/vpd";
 
 void usage(void)
@@ -39,12 +48,21 @@ int main(int argc, char *argv[])
 #if defined(TARGET_LEGACY)
 	VPD vpd(true);
 
-	char *gpio = getenv("VPD_EEPROM_GPIO");
-	int gpio_nr = gpio ? atoi(gpio) : -1;
-	std::string eepromFullPath = "/home/hcl/legacy/eeprom";
-	char *epath = getenv("VPD_EEPROM_PATH");
-	if (epath)
-		eepromFullPath = epath;
+	std::string eepromFullPath;
+#ifdef VPD_EEPROM_PATH
+	eepromFullPath = vpd_eeprom_path;
+#endif
+	if (eepromFullPath == "")
+	{
+		char *epath = getenv("VPD_EEPROM_PATH");
+		if (epath)
+			eepromFullPath = epath;
+	}
+	if (eepromFullPath == "")
+	{
+		std::cerr << "No path to eeprom given\n";
+		return -1;
+	}
 
 	struct stat buf;
 	ret = stat(eepromFullPath.c_str(), &buf);
@@ -56,7 +74,7 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
 	std::cout << "Eeprom at " << eepromFullPath << std::endl;
 #endif
-	userStorage = new EepromVpd(eepromFullPath, EEPROM_SIZE, gpio_nr);
+	userStorage = new EepromVpd(eepromFullPath, EEPROM_SIZE);
 	if (!vpd.load(userStorage))
 	{
 		std::cerr << "nvram: unable to load data from " << eepromFullPath << std::endl;
