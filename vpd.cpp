@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string.h>
-#include <syslog.h>
 #include "vpd.h"
 #include "crc32.h"
 
@@ -12,10 +11,15 @@ VPD::VPD(bool legacyMode) :
 	if (legacyMode)
 	{
 		_immutables.push_back("ETH_MAC_ADDR");
+		_immutables.push_back("HW_BOARD_ID");
 		_immutables.push_back("HW_BOARD_REVISION");
 		_immutables.push_back("LM_PRODUCT_DATE");
 		_immutables.push_back("LM_PRODUCT_ID");
-		_immutables.push_back("LM_PRODUC_SERIAL");
+		_immutables.push_back("LM_PRODUCT_SERIAL");
+		_immutables.push_back("LM_PRODUCT_TYPE");
+		_immutables.push_back("LM_PRODUCT_UUID");
+		_immutables.push_back("USB_PID");
+		_immutables.push_back("USB_VID");
 	}
 }
 
@@ -28,7 +32,7 @@ bool VPD::load(VpdStorage *st, bool immutables)
 	std::list<std::string> sList;
 	if ( !st->load(sList))
 	{
-		syslog(LOG_WARNING, "VPD::load: unable to load file\n");
+		std::cerr << "VPD::load: unable to load file\n";
 		return false;
 	}
 
@@ -37,7 +41,7 @@ bool VPD::load(VpdStorage *st, bool immutables)
 	{
 		int pos = it->find_first_of('=');
 		if ( pos == 0 || pos == std::string::npos)
-			syslog(LOG_WARNING, "VPD::load: Malformed line %s\n", it->c_str());
+			std::cerr << "VPD::load: Malformed line " << it->c_str() << std::endl;
 		else
 		{
 			std::string key = it->substr(0, pos);

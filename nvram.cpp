@@ -1,4 +1,3 @@
-#include "common.h"
 #include "filevpd.h"
 #include "vpd.h"
 #include <errno.h>
@@ -6,7 +5,6 @@
 #include <iostream>
 #include <list>
 #include "eeprom_vpd.h"
-#include <syslog.h>
 #include <sys/stat.h>
 
 #define EEPROM_SIZE 0x800
@@ -30,7 +28,6 @@ int main(int argc, char *argv[])
 {
 	int ret=0;
 	std::list<std::string> argvList;
-	openlog("nvram", 0, LOG_USER);
 	for (int n=1; n < argc; n++)
 	{
 		std::string str(argv[n]);
@@ -41,10 +38,31 @@ int main(int argc, char *argv[])
 	VpdStorage *userStorage=0;
 #if defined(TARGET_LEGACY)
 	VPD vpd(true);
-	const std::string eepromInitialPath = "/sys/bus/i2c/devices";
-	char *gpio = getenv("VPD_GPIO");
-	int gpio_nr = gpio ? atoi(gpio) ? -1;
-	userStorage = new EepromVpd(findEEprom(eepromInitialPath), EEPROM_SIZE, gpio_nr);
+
+	char *gpio = getenv("VPD_EEPROM_GPIO");
+	int gpio_nr = gpio ? atoi(gpio) : -1;
+	std::string eepromFullPath = "/home/hcl/legacy/eeprom";
+	char *epath = getenv("VPD_EEPROM_PATH");
+	if (epath)
+		eepromFullPath = epath;
+
+	struct stat buf;
+	ret = stat(eepromFullPath.c_str(), &buf);
+	if (ret == 0 && !S_ISREG(buf.st_mode))
+	{
+		std::cerr << "Eeprom file path " << eepromFullPath << " invalid -exit\n";
+		return -1;
+	}
+#ifdef DEBUG
+	std::cout << "Eeprom at " << eepromFullPath << std::endl;
+#endif
+	userStorage = new EepromVpd(eepromFullPath, EEPROM_SIZE, gpio_nr);
+	if (!vpd.load(userStorage))
+	{
+		std::cerr << "nvram: unable to load data from " << eepromFullPath << std::endl;
+		delete userStorage;
+		return -1;
+	}
 #else
 	VPD vpd;
 	const char *vpdPathFactory = getenv("VPD_FACTORY");
@@ -55,7 +73,7 @@ int main(int argc, char *argv[])
 	ret = stat(vpdPathFactory, &buf);
 	if (ret == 0 && !S_ISREG(buf.st_mode))
 	{
-		syslog(LOG_ERR, "Factory file path %s invalid - exiting \n", vpdPathFactory);
+		std::cerr << "Factory file path " << vpdPathFactory << " invalid - exiting \n";
 		return -1;
 	}
 
@@ -64,7 +82,7 @@ int main(int argc, char *argv[])
 		factoryStorage = new FileVpd(vpdPathFactory);
 		if (!vpd.load(factoryStorage, true))
 		{
-			syslog(LOG_WARNING, "No factory VPD data in %s - exiting \n", vpdPathFactory);
+			std::cerr <<  "No factory VPD data in " << vpdPathFactory << " exiting \n";
 			delete factoryStorage;
 			return -1;
 		}
@@ -77,15 +95,15 @@ int main(int argc, char *argv[])
 	ret = stat(vpdPathUser, &buf);
 	if (ret == 0 && !S_ISREG(buf.st_mode))
 	{
-		syslog(LOG_ERR, "User file path %s not a regular file \n", vpdPathUser);
+		std::cerr << "User file path " << vpdPathUser << " not a regular file";
 		delete factoryStorage;
 		return -1;
 	}
 
     userStorage = new FileVpd(vpdPathUser);
+    vpd.load(userStorage);
 #endif
 
-	vpd.load(userStorage);
 	ret = 0;
 
     if (argvList.empty() || argvList.front() == "list")
@@ -168,7 +186,6 @@ cleanexit:
     	delete factoryStorage;
     if (userStorage)
     	delete userStorage;
-    closelog();
     return ret;
 }
 

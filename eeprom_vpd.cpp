@@ -32,7 +32,7 @@ bool EepromVpd::load(std::list<std::string>& to)
 
     if (fd < 0 )
     {
-        std::cerr << __func__ << ": No MTD at " << _filePath << std::endl;
+        std::cerr << __func__ << ": No device " << _filePath << std::endl;
         return false;
     }
 
@@ -59,7 +59,7 @@ bool EepromVpd::load(std::list<std::string>& to)
 	char *p = (char*)(image+4);
 	int left = _eeSize-4;
 
-	while (left > 0)
+	while (left > 0 && isascii(*p))
 	{
 		int n = strnlen(p, left);
 		to.push_back(p);
@@ -99,6 +99,7 @@ bool EepromVpd::store(const std::list<std::string>& strings)
     	write(gpioFd, gpioCommand, 2);
     }
     uint8_t *image = new uint8_t[_eeSize];
+    memset(image, 0xff, _eeSize);
     char *p = (char*)image+4;
     std::list<std::string>::const_iterator it = strings.cbegin();
     while (it != strings.cend())
