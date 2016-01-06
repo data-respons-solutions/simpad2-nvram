@@ -12,7 +12,7 @@
 #define XSTR(a) STRINGIFY(a)
 #define STRINGIFY(x) #x
 
-#ifdef VPD_EEPROM_PATH
+#ifdef TARGET_LEGACY
 const char *vpd_eeprom_path = XSTR(VPD_EEPROM_PATH);
 #endif
 
@@ -48,10 +48,7 @@ int main(int argc, char *argv[])
 #if defined(TARGET_LEGACY)
 	VPD vpd(true);
 
-	std::string eepromFullPath;
-#ifdef VPD_EEPROM_PATH
-	eepromFullPath = vpd_eeprom_path;
-#endif
+	std::string eepromFullPath = vpd_eeprom_path;
 	if (eepromFullPath == "")
 	{
 		char *epath = getenv("VPD_EEPROM_PATH");
