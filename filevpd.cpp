@@ -52,5 +52,7 @@ bool FileVpd::store(const std::list<std::string>& strings)
 	std::list<std::string>::const_iterator it = strings.cbegin();
 	while (it != strings.cend())
 		os << (*it++) << std::endl;
+	os.flush();
 	os.close();
+
 }
