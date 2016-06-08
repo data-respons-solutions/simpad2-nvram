@@ -5,15 +5,25 @@
 #include <iostream>
 #include <list>
 #include "eeprom_vpd.h"
+#include "eeprom_vpd_nofs.h"
 #include <sys/stat.h>
 
-#define EEPROM_SIZE 0x800
+//#define DEBUG
 
 #define XSTR(a) STRINGIFY(a)
 #define STRINGIFY(x) #x
 
+#ifdef TARGET_SPERRE
+const char *vpd_eeprom_path = XSTR(VPD_EEPROM_PATH);
+#define EEPROM_SIZE 		0x200000	// EEPROM of /dev/mtd1 is 2MB
+//#define EEPROM_USE_SIZE 	0x1000		// we are going to use 4KB for now, minimum eraseblock size 4096 bytes, 4.0 KiB
+#define EEPROM_CRC_SIZE 	0x4			// reserve 4 bytes for CRC checksum, CRC in front of message
+#define EEPROM_USE_SIZE 	(0x27 + EEPROM_CRC_SIZE)		// we are going to use 39 bytes for now, which is serial number only written to /dev/mtd1
+#endif
+
 #ifdef TARGET_LEGACY
 const char *vpd_eeprom_path = XSTR(VPD_EEPROM_PATH);
+#define EEPROM_SIZE 0x800
 #endif
 
 
@@ -43,8 +53,8 @@ int main(int argc, char *argv[])
 		argvList.push_back(str);
 	}
 
-	VpdStorage *factoryStorage=0;
-	VpdStorage *userStorage=0;
+	VpdStorage *factoryStorage = NULL;
+	VpdStorage *userStorage = NULL;
 #if defined(TARGET_LEGACY)
 	VPD vpd(true);
 
@@ -72,6 +82,39 @@ int main(int argc, char *argv[])
 	std::cout << "Eeprom at " << eepromFullPath << std::endl;
 #endif
 	userStorage = new EepromVpd(eepromFullPath, EEPROM_SIZE);
+	if (!vpd.load(userStorage))
+	{
+		std::cerr << "nvram: unable to load data from " << eepromFullPath << std::endl;
+		delete userStorage;
+		return -1;
+	}
+#elif defined(TARGET_SPERRE)
+	VPD vpd(true);
+
+	std::string eepromFullPath = vpd_eeprom_path;
+	if (eepromFullPath == "")
+	{
+		char *epath = getenv("VPD_EEPROM_PATH");
+		if (epath)
+			eepromFullPath = epath;
+	}
+	if (eepromFullPath == "")
+	{
+		std::cerr << "No path to eeprom given\n";
+		return -1;
+	}
+
+	struct stat buf;
+	ret = stat(eepromFullPath.c_str(), &buf);
+	if (ret == 0 && !S_ISCHR(buf.st_mode))
+	{
+		std::cerr << "Eeprom file path " << eepromFullPath << " invalid -exit\n";
+		return -1;
+	}
+#ifdef DEBUG
+	std::cout << "Eeprom at " << eepromFullPath << std::endl;
+#endif
+	userStorage = new EepromVpdNoFS(eepromFullPath, EEPROM_SIZE);	//EEPROM_SIZE
 	if (!vpd.load(userStorage))
 	{
 		std::cerr << "nvram: unable to load data from " << eepromFullPath << std::endl;
