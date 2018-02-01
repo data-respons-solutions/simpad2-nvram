@@ -10,15 +10,17 @@
 FileVpd::FileVpd(const std::string& filePath)
 {
 	_filePath = filePath;
+	_buf = new char[cMax];
 }
 
 FileVpd::~FileVpd()
 {
+	delete _buf;
 }
 
 bool FileVpd::load(std::list<std::string>& sList)
 {
-	char buf[256];
+
 	struct stat status;
 	if (stat(_filePath.c_str(), &status) < 0)
 		return true;
@@ -30,13 +32,20 @@ bool FileVpd::load(std::list<std::string>& sList)
 
 	while (1)
 	{
-		is.getline(buf, 256);
+		is.getline(_buf, cMax);
 		if ( is.eof())
 			break;
-		int length = strnlen(buf, 256);
-		if (length > 0 && buf[length-1] == '\n')
-			buf[length-1]= '\0';
-		sList.push_back(buf);
+
+		if (is.fail())
+		{
+			std::cerr << "VPD file contains string longer than max " << cMax << "\n";
+			break;
+		}
+
+		int length = strnlen(_buf, cMax);
+		if (length > 0 && _buf[length-1] == '\n')
+			_buf[length-1]= '\0';
+		sList.push_back(_buf);
 	}
 	return true;
 }
@@ -54,5 +63,6 @@ bool FileVpd::store(const std::list<std::string>& strings)
 		os << (*it++) << std::endl;
 	os.flush();
 	os.close();
+	return true;
 
 }

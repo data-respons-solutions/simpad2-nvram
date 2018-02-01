@@ -4,7 +4,7 @@ CXX ?= g++
 INSTALL_PATH ?= /usr/sbin
 
 
-TARGET_TYPE ?= TARGET_SPERRE
+TARGET_TYPE ?= TARGET_CARGOTEC
 VPD_EEPROM_PATH = /dev/mtd1
 
 CXXFLAGS += -D$(TARGET_TYPE) -std=c++11 -DVPD_EEPROM_PATH=$(VPD_EEPROM_PATH)
@@ -23,4 +23,3 @@ install:
 
 clean:
 	rm -f *.o nvram
-

@@ -12,6 +12,8 @@ public:
     bool store(const std::list<std::string>& strings);
 private:
     std::string _filePath;
+    char* _buf;
+    static constexpr int cMax = 4096;
 };
 
 #endif // FILEVPD_H
