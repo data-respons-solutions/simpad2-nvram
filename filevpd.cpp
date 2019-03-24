@@ -1,7 +1,6 @@
 #include <string>
 #include <iostream>
 #include "filevpd.h"
-#include "crc32.h"
 #include <sys/stat.h>
 #include <errno.h>
 #include <string.h>

@@ -3,8 +3,7 @@ CXX ?= g++
 
 INSTALL_PATH ?= /usr/sbin
 
-
-TARGET_TYPE ?= TARGET_CARGOTEC
+TARGET_TYPE ?= TARGET_FILE
 VPD_EEPROM_PATH = /dev/mtd1
 
 CXXFLAGS += -D$(TARGET_TYPE) -std=c++11 -DVPD_EEPROM_PATH=$(VPD_EEPROM_PATH)
@@ -17,6 +16,10 @@ all: nvram
 
 nvram : $(COMMON_OBJS) Makefile
 	$(CXX) -o nvram  $(COMMON_OBJS) $(LDFLAGS)
+	
+nvram_file : filevpd.o vpd.o
+	$(CXX) $(CXXFLAGS) -DTARGET_FILE -c nvram.cpp -o nvram.o
+	$(CXX) -o $@ $^ nvram.o $(LDFLAGS)
 
 install:
 	install -m 0755 -D nvram $(INSTALL_PATH)/nvram
