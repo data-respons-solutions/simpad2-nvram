@@ -1,4 +1,5 @@
 #include "filevpd.h"
+#include "efivpd.h"
 #include "vpd.h"
 #include <errno.h>
 #include <stdlib.h>
@@ -26,9 +27,13 @@ const char *vpd_eeprom_path = XSTR(VPD_EEPROM_PATH);
 #define EEPROM_SIZE 0x800
 #endif
 
-
-
 static const std::string initFile = "/nvram/factory/vpd";
+
+#ifdef TARGET_EFI
+static const std::string efivarfs_path = "/sys/firmware/efi/efivars";
+static const std::string efi_user_var = "user";
+static const EfiGuid efi_datarespons_guid = {0x604dafe4,0x587a,0x47f6,{0x86,0x04,0x3d,0x33,0xeb,0x83,0xda,0x3d}};
+#endif
 
 void usage(void)
 {
@@ -121,6 +126,20 @@ int main(int argc, char *argv[])
 		delete userStorage;
 		return -1;
 	}
+#elif defined(TARGET_EFI)
+	VPD vpd;
+
+	struct stat buf;
+	ret = stat(efivarfs_path.c_str(), &buf);
+	if (ret != 0 || !S_ISDIR(buf.st_mode))
+	{
+		std::cerr << "efivarfs not found on " << efivarfs_path << " - exiting\n";
+		return -1;
+	}
+
+	userStorage = new EfiVpd(efivarfs_path, efi_user_var, efi_datarespons_guid);
+	vpd.load(userStorage);
+
 #else
 	VPD vpd;
 	const char *vpdPathFactory = getenv("VPD_FACTORY");
