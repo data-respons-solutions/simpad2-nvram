@@ -8,6 +8,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <algorithm>
+extern "C" {
+#include <ext2fs/ext2_fs.h>
+#include <e2p/e2p.h>
+}
 
 const std::string guid_to_str(const EfiGuid& guid)
 {
@@ -63,6 +67,29 @@ bool EfiVpd::load(std::list<std::string>& sList)
 	return true;
 }
 
+static bool set_immutable(const char* name, bool immutable)
+{
+	unsigned long flags = 0LU;
+	if (fgetflags(name, &flags) != 0) {
+		std::cerr << "Failed getting flags:  " << name << ": " << std::strerror(errno) << "\n";
+		return false;
+	}
+
+	if (immutable) {
+		flags |= EXT2_IMMUTABLE_FL;
+	}
+	else {
+		flags &= ~EXT2_IMMUTABLE_FL;
+	}
+
+	if (fsetflags(name, flags) != 0) {
+		std::cerr << "Failed setting flags:  " << name << ": " << std::strerror(errno) << "\n";
+		return false;
+	}
+
+	return true;
+}
+
 bool EfiVpd::store(const std::list<std::string>& strings)
 {
 	memcpy(_buf.data(), reinterpret_cast<const char*>(&efiattr), sizeof(efiattr));
@@ -84,6 +111,13 @@ bool EfiVpd::store(const std::list<std::string>& strings)
 		}
 	}
 
+	struct stat status;
+	if (stat(_filePath.c_str(), &status) == 0) {
+		if (!set_immutable(_filePath.c_str(), false)) {
+			return false;
+		}
+	}
+
 	int fd = 0;
 	fd = open(_filePath.c_str(), O_RDWR|O_CREAT|O_TRUNC, 0644);
 	if (fd < 0) {
@@ -95,6 +129,10 @@ bool EfiVpd::store(const std::list<std::string>& strings)
 	close(fd);
 	if (ret != total_size) {
 		std::cerr << "Failed writing to:  " << _filePath << ": " << std::strerror(errno) << "\n";
+		return false;
+	}
+
+	if (!set_immutable(_filePath.c_str(), true)) {
 		return false;
 	}
 

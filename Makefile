@@ -22,7 +22,7 @@ nvram_file.o : nvram.cpp
 nvram_efi.o : nvram.cpp
 	$(CXX) $(CXXFLAGS) $(CXXFLAGS_EFI) -c -o $@ $<
 
-nvram_legacy.o : nvram.cpp
+nvram_legacldd y.o : nvram.cpp
 	$(CXX) $(CXXFLAGS) $(CXXFLAGS_LEGACY) -c -o $@ $<
 	
 nvram_sperre.o : nvram.cpp
@@ -32,7 +32,7 @@ nvram_file : $(COMMON_OBJS) nvram_file.o filevpd.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 	
 nvram_efi : $(COMMON_OBJS) nvram_efi.o efivpd.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
+	$(CXX) -o $@ $^ $(LDFLAGS) -le2p
 	
 nvram_legacy : $(COMMON_OBJS) nvram_legacy.o eeprom_vpd.o crc32.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
