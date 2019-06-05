@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <iostream>
+#include <cstring>
 #include <list>
 #include "eeprom_vpd.h"
 #include "eeprom_vpd_nofs.h"
@@ -14,12 +15,73 @@
 #define XSTR(a) STRINGIFY(a)
 #define STRINGIFY(x) #x
 
-#ifdef TARGET_SPERRE
-const char *vpd_eeprom_path = XSTR(VPD_EEPROM_PATH);
-#define EEPROM_SIZE 		0x200000	// EEPROM of /dev/mtd1 is 2MB
-//#define EEPROM_USE_SIZE 	0x1000		// we are going to use 4KB for now, minimum eraseblock size 4096 bytes, 4.0 KiB
-#define EEPROM_CRC_SIZE 	0x4			// reserve 4 bytes for CRC checksum, CRC in front of message
-#define EEPROM_USE_SIZE 	(0x27 + EEPROM_CRC_SIZE)		// we are going to use 39 bytes for now, which is serial number only written to /dev/mtd1
+#ifdef TARGET_MTD
+#include <mtd/libmtd.h>
+const char *vpd_mtd_label = XSTR(VPD_MTD_LABEL);
+
+static int find_mtd(const char* label, int* mtd_num, long long* mtd_size)
+{
+	libmtd_t mtd = nullptr;
+	struct mtd_dev_info *mtd_dev = nullptr;
+	struct mtd_info *mtd_info = nullptr;
+	int status = -1;
+
+	mtd = libmtd_open();
+		if (!mtd) {
+			switch (errno) {
+			case 0:
+				std::cerr<< "mtd subsystem not available" << " - exiting\n";
+				goto errorexit;
+			default:
+				std::cerr<< "libmtd_open:  " << std::strerror(errno)  << " - exiting\n";
+				goto errorexit;
+			}
+		}
+
+		mtd_info = (struct mtd_info*) malloc(sizeof(struct mtd_info));
+		if (mtd_get_info(mtd, mtd_info)) {
+			std::cerr<< "mtd_get_info " << std::strerror(errno)  << " - exiting\n";
+			goto errorexit;
+
+		}
+
+		mtd_dev = (struct mtd_dev_info*) malloc(sizeof(struct mtd_dev_info));
+		for (int i = mtd_info->lowest_mtd_num; i <= mtd_info->highest_mtd_num; ++i) {
+			if (mtd_get_dev_info1(mtd, i, mtd_dev)) {
+				std::cerr<< "mtd_get_dev_info(node: " << i << "): " << std::strerror(errno)  << " - exiting\n";
+				goto errorexit;
+			}
+
+			if (!strcmp(mtd_dev->name, label)) {
+				*mtd_num = mtd_dev->mtd_num;
+				*mtd_size = mtd_dev->size;
+				break;
+			}
+
+			if (i == mtd_info->highest_mtd_num) {
+				std::cerr << "find_mtd: device with label: \"" << label << "\": not found - exiting\n";
+				goto errorexit;
+			}
+		}
+
+	status = 0;
+
+errorexit:
+	if (mtd) {
+		libmtd_close(mtd);
+		mtd = nullptr;
+	}
+	if (mtd_dev) {
+		free(mtd_dev);
+		mtd_dev = nullptr;
+	}
+
+	if (mtd_info) {
+		free(mtd_info);
+		mtd_info = nullptr;
+	}
+	return status;
+}
 #endif
 
 #ifdef TARGET_LEGACY
@@ -93,36 +155,33 @@ int main(int argc, char *argv[])
 		delete userStorage;
 		return -1;
 	}
-#elif defined(TARGET_SPERRE)
+#elif defined(TARGET_MTD)
 	VPD vpd(true);
 
-	std::string eepromFullPath = vpd_eeprom_path;
-	if (eepromFullPath == "")
-	{
-		char *epath = getenv("VPD_EEPROM_PATH");
-		if (epath)
-			eepromFullPath = epath;
-	}
-	if (eepromFullPath == "")
-	{
-		std::cerr << "No path to eeprom given\n";
+	std::string mtd_label = vpd_mtd_label;
+	char *elabel = getenv("VPD_MTD_LABEL");
+		if (elabel)
+			mtd_label = elabel;
+
+	int mtd_num = -1;
+	long long mtd_size = -1;
+	if (find_mtd(mtd_label.c_str(), &mtd_num, &mtd_size)) {
 		return -1;
 	}
 
 	struct stat buf;
-	ret = stat(eepromFullPath.c_str(), &buf);
+	std::string mtd_path = "/dev/mtd" + std::to_string(mtd_num);
+	ret = stat(mtd_path.c_str(), &buf);
 	if (ret == 0 && !S_ISCHR(buf.st_mode))
 	{
-		std::cerr << "Eeprom file path " << eepromFullPath << " invalid -exit\n";
+		std::cerr << "mtd file path invalid: " << mtd_path << " - exiting\n";
 		return -1;
 	}
-#ifdef DEBUG
-	std::cout << "Eeprom at " << eepromFullPath << std::endl;
-#endif
-	userStorage = new EepromVpdNoFS(eepromFullPath, EEPROM_SIZE);	//EEPROM_SIZE
+
+	userStorage = new EepromVpdNoFS(mtd_path, mtd_size);
 	if (!vpd.load(userStorage))
 	{
-		std::cerr << "nvram: unable to load data from " << eepromFullPath << std::endl;
+		std::cerr << "nvram: unable to load data from " << mtd_path << std::endl;
 		delete userStorage;
 		return -1;
 	}
@@ -139,7 +198,6 @@ int main(int argc, char *argv[])
 
 	userStorage = new EfiVpd(efivarfs_path, efi_user_var, efi_datarespons_guid);
 	vpd.load(userStorage);
-
 #else
 	VPD vpd;
 	const char *vpdPathFactory = getenv("VPD_FACTORY");
