@@ -17,10 +17,12 @@
 #include <mtd/mtd-user.h>
 #include <sys/ioctl.h>
 
-EepromVpdNoFS::EepromVpdNoFS(const std::string& file, int size, int wpGpio)
+EepromVpdNoFS::EepromVpdNoFS(const std::string& file, int size, const std::string& wpGpio = "")
 {
 	_filePath = file;
-	_wpGpio = wpGpio;
+	if (wpGpio != "") {
+		_wpGpioPath = std::string() + "/sys/class/gpio/" + wpGpio + "/value";
+	}
 	_eeSize = size;
 }
 
@@ -119,14 +121,12 @@ bool EepromVpdNoFS::store(const std::list<std::string>& strings)
         return false;
     }
 
-    if (_wpGpio >= 0)
+    if (!_wpGpioPath.empty())
     {
-    	std::string gpioPath = "/sys/class/gpio/gpio" + _wpGpio;
-    	gpioPath.append("/value");
-    	gpioFd = open(gpioPath.c_str(), O_WRONLY);
+    	gpioFd = open(_wpGpioPath.c_str(), O_WRONLY);
     	if (gpioFd < 0)
     	{
-    		std::cerr << __func__ << ": Unable to open gpio " << gpioPath << std::endl;
+    		std::cerr << __func__ << ": Unable to open gpio " << _wpGpioPath << std::endl;
     		close(fd);
     		return false;
     	}

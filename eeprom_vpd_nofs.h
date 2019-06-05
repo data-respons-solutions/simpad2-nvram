@@ -18,7 +18,7 @@
 class EepromVpdNoFS : public VpdStorage
 {
 public:
-	EepromVpdNoFS(const std::string& fileName, int eesize, int wpGpio=-1);
+	EepromVpdNoFS(const std::string& fileName, int eesize, const std::string& wpGpio);
 	virtual ~EepromVpdNoFS();
 
 	bool load(std::list<std::string>& to);
@@ -26,7 +26,7 @@ public:
 	int erase_eeprom(int fd, u_int32_t offset, u_int32_t bytes);
 private:
 	std::string _filePath;
-	int _wpGpio; 	// Optional write protect (low) GPIO number
+	std::string _wpGpioPath; 	// Optional write protect (low) GPIO number
 	int _eeSize;	// Size in bytes
 };
 

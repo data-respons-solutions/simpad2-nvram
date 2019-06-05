@@ -18,6 +18,7 @@
 #ifdef TARGET_MTD
 #include <mtd/libmtd.h>
 const char *vpd_mtd_label = XSTR(VPD_MTD_LABEL);
+const char *vpd_mtd_gpio = XSTR(VPD_MTD_GPIO);
 
 static int find_mtd(const char* label, int* mtd_num, long long* mtd_size)
 {
@@ -178,7 +179,12 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	userStorage = new EepromVpdNoFS(mtd_path, mtd_size);
+	std::string mtd_gpio = vpd_mtd_gpio;
+	char *egpio = getenv("VPD_MTD_GPIO");
+		if (egpio)
+			mtd_gpio = egpio;
+
+	userStorage = new EepromVpdNoFS(mtd_path, mtd_size, mtd_gpio);
 	if (!vpd.load(userStorage))
 	{
 		std::cerr << "nvram: unable to load data from " << mtd_path << std::endl;
