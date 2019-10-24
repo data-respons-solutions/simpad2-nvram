@@ -143,7 +143,27 @@ static int test_nvram_section()
 		return 1;
 	}
 
+	if (counter_1 != 16) {
+		printf("test_section1 wrong counter returned\n");
+		return 1;
+	}
+
+	if (data_len_1 != 39) {
+		printf("test_section1 wrong data_len returned\n");
+		return 1;
+	}
+
 	if (is_valid_nvram_section((uint8_t*) &test_section2, sizeof(test_section2), &data_len_2, &counter_2)) {
+		return 1;
+	}
+
+	if (counter_2 != 5) {
+		printf("test_section2 wrong counter returned\n");
+		return 1;
+	}
+
+	if (data_len_2 != 39) {
+		printf("test_section2 wrong data_len returned\n");
 		return 1;
 	}
 
