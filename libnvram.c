@@ -197,17 +197,52 @@ static void fill_nvram_header(uint8_t* data, uint32_t counter, uint32_t data_siz
 	memcpy(data + NVRAM_HEADER_CRC32_OFFSET, &le_crc32, sizeof(le_crc32));
 }
 
-void destroy_nvram_node(struct nvram_node* node)
+static void destroy_nvram_node(struct nvram_node* node)
 {
 	if (node) {
-		if (node->next) {
-			destroy_nvram_node(node->next);
-		}
 		free(node);
 		node = NULL;
 	}
 }
 
+void destroy_nvram_list(struct nvram_list* list)
+{
+	if (list->entry) {
+		struct nvram_node* cur = list->entry;
+		struct nvram_node* next = NULL;
+		while (cur) {
+			next = cur->next;
+			destroy_nvram_node(cur);
+			cur = next;
+		}
+		list->entry = NULL;
+	}
+}
+/*
+int append_entry(struct nvram_node* node, const char* key, const char* value)
+{
+	struct nvram_node* prev = node;
+	while(node) {
+		if (!strcmp(key, node->key)) {
+			if(!strcmp(value, node->value)) {
+				return 0;
+			}
+
+
+			}
+		}
+		prev = node;
+		node = node->next;
+	}
+}
+
+int get_entry(const struct nvram_node* node)
+{
+
+}
+
+int remove_entry(struct nvram_node* node, )
+*/
 int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len, uint32_t* counter)
 {
 	if (len < NVRAM_HEADER_SIZE) {
@@ -236,12 +271,17 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 	return 1;
 }
 
-int nvram_section_deserialize(struct nvram_node** node, const uint8_t* data, uint32_t len)
+int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint32_t len)
 {
 	if (!data) {
 		debug("data empty\n");
 		return -EINVAL;
 	}
+	if (list->entry) {
+		debug("list not empty\n");
+		return -EINVAL;
+	}
+
 	if (len < NVRAM_MIN_SIZE) {
 		//debug("len(%" PRIu32 ") smaller than NVRAM_MIN_SIZE(%" PRIu32 ")\n", len, NVRAM_MIN_SIZE);
 		return -EINVAL;
@@ -276,19 +316,19 @@ int nvram_section_deserialize(struct nvram_node** node, const uint8_t* data, uin
 		i += NVRAM_ENTRY_HEADER_SIZE + key_len + value_len;
 	}
 
-	*node = new;
+	list->entry = new;
 
 	return 0;
 }
 
-int nvram_section_serialize(struct nvram_node* const node, uint32_t counter, uint8_t** data, uint32_t* len)
+int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t** data, uint32_t* len)
 {
-	if (!node) {
-		debug("node empty\n");
+	if (!list) {
+		debug("list empty\n");
 		return -EINVAL;
 	}
 
-	const uint32_t data_len = calc_serialized_entries_size(node);
+	const uint32_t data_len = calc_serialized_entries_size(list->entry);
 	const uint32_t buf_len = NVRAM_HEADER_SIZE + data_len;
 	debug("allocating: %" PRIu32 "b\n", buf_len);
 	uint8_t* buf = malloc(buf_len);
@@ -297,7 +337,7 @@ int nvram_section_serialize(struct nvram_node* const node, uint32_t counter, uin
 		return -ENOMEM;
 	}
 
-	struct nvram_node* cur = node;
+	struct nvram_node* cur = list->entry;
 	for (uint32_t i = NVRAM_HEADER_SIZE; cur; cur = cur->next) {
 		i += fill_nvram_entry(buf + i, cur->key, cur->value);
 	}

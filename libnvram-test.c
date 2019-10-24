@@ -109,29 +109,28 @@ static int test_nvram_deserialize()
 
 	int ret = 0;
 
-	struct nvram_node* node = NULL;
-	ret = nvram_section_deserialize(&node, (uint8_t*) &test_section1, sizeof(test_section1));
+	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	ret = nvram_section_deserialize(&list, (uint8_t*) &test_section1, sizeof(test_section1));
 	if (ret < 0) {
 		printf("nvram_section_deserialize failed: %s\n", strerror(-ret));
 		goto error_exit;
 	}
 
-	if(!test_node(node, test_key1, test_val1)) {
+	if(!test_node(list.entry, test_key1, test_val1)) {
 		printf("node1 corrupt\n");
 		goto error_exit;
 	}
 
-	node = node->next;
-	if(!test_node(node, test_key2, test_val2)) {
+	if(!test_node(list.entry->next, test_key2, test_val2)) {
 		printf("node2 corrupt\n");
 		goto error_exit;
 	}
 
-	destroy_nvram_node(node);
+	destroy_nvram_list(&list);
 	return 1;
 
 error_exit:
-	destroy_nvram_node(node);
+destroy_nvram_list(&list);
 	return 0;
 }
 
@@ -140,8 +139,9 @@ static int test_nvram_serialize()
 	int ret = 0;
 	uint8_t* data = NULL;
 	uint32_t size = 0;
-
-	ret = nvram_section_serialize(&test_node1, 0x10, &data, &size);
+	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	list.entry = &test_node1;
+	ret = nvram_section_serialize(&list, 0x10, &data, &size);
 	if (ret) {
 		printf("Serialize failed: %s\n", strerror(-ret));
 		goto error_exit;

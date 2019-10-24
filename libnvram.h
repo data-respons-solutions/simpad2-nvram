@@ -23,13 +23,19 @@ struct nvram_node {
 	struct nvram_node* next;
 };
 
+#define NVRAM_LIST_INITIALIZER {NULL}
+
+struct nvram_list {
+	struct nvram_node* entry;
+};
+
 /*
- * Destroy nvram node
+ * Destroy nvram list
  *
  * @params
- *   node: node to destroy
+ *   list: list to destroy
  */
-void destroy_nvram_node(struct nvram_node* node);
+void destroy_nvram_list(struct nvram_list* list);
 
 /*
  * Verify buffer contains valid nvram section
@@ -50,7 +56,7 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
  * This function expects nvram section is valid.
  *
  * @params
- *  node: returns nodes with entries (Resource should be released with destroy_nvram_node() by caller)
+ *  list: returns list with entries (Resource should be released with destroy_nvram_node() by caller)
  *  data: data buffer
  *  len:  data buffer length
  *
@@ -58,13 +64,13 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
  *  0 for success
  *  Negative errno for error
  */
-int nvram_section_deserialize(struct nvram_node** node, const uint8_t* data, uint32_t len);
+int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint32_t len);
 
 /*
  * Create serialized data buffer from nodes
  *
  * @params
- *  node: node with entries
+ *  list: list with entries
  *  counter: Value of counter to insert into section header
  *  data: Returned data buffer
  *  len:  Returned data buffer length
@@ -73,6 +79,6 @@ int nvram_section_deserialize(struct nvram_node** node, const uint8_t* data, uin
  *  0 for success
  *  Negative errno for error
  */
-int nvram_section_serialize(struct nvram_node* node, uint32_t counter, uint8_t** data, uint32_t* len);
+int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t** data, uint32_t* len);
 
 #endif // _LIBNVRAM_H_
