@@ -97,11 +97,11 @@ static uint32_t u32tole(uint32_t host)
  *   NULL for failure.
  */
 static struct nvram_node*
-create_nvram_node(const uint8_t* data, uint32_t key_len, uint32_t value_len)
+create_nvram_node(const uint8_t* key, uint32_t key_len, const uint8_t* value, uint32_t value_len)
 {
 	const uint32_t key_str_len = key_len + 1;
 	const uint32_t value_str_len = value_len + 1;
-	size_t sz = key_str_len + value_str_len + sizeof(struct nvram_node);
+	const size_t sz = key_str_len + value_str_len + sizeof(struct nvram_node);
 	struct nvram_node* node = malloc(sz);
 	if (!node) {
 		debug("malloc failed\n");
@@ -109,16 +109,28 @@ create_nvram_node(const uint8_t* data, uint32_t key_len, uint32_t value_len)
 	}
 
 	node->key = (char*) node + sizeof(struct nvram_node);
-	memcpy(node->key, (char*) data, key_len);
+	memcpy(node->key, (char*) key, key_len);
 	node->key[key_str_len] = '\0';
 	node->value = (char*) node + sizeof(struct nvram_node) + key_str_len;
-	memcpy(node->value, (char*) data + key_len, value_len);
+	memcpy(node->value, (char*) value, value_len);
 	node->value[value_str_len] = '\0';
 	node->next = NULL;
 
 	debug("new: %s = %s\n", node->key, node->value);
 
 	return node;
+}
+
+static struct nvram_node*
+create_nvram_node_str(const char* key, const char* value)
+{
+	return create_nvram_node((uint8_t*) key, strlen(key), (uint8_t*) value, strlen(value));
+}
+
+static struct nvram_node*
+create_nvram_node_raw(const uint8_t* data, uint32_t key_len, uint32_t value_len)
+{
+	return create_nvram_node(data, key_len, data + key_len, value_len);
 }
 
 /*
@@ -218,31 +230,57 @@ void destroy_nvram_list(struct nvram_list* list)
 		list->entry = NULL;
 	}
 }
-/*
-int append_entry(struct nvram_node* node, const char* key, const char* value)
+
+int nvram_list_set(struct nvram_list* list, const char* key, const char* value)
 {
-	struct nvram_node* prev = node;
-	while(node) {
-		if (!strcmp(key, node->key)) {
-			if(!strcmp(value, node->value)) {
+	nvram_list_remove(list, key);
+
+	struct nvram_node* cur = list->entry;
+	while(cur) {
+		if(!cur->next) {
+			cur->next = create_nvram_node_str(key, value);
+			if (cur->next) {
 				return 0;
 			}
-
-
-			}
+			debug("malloc failed\n");
+			return -ENOMEM;
 		}
-		prev = node;
-		node = node->next;
 	}
+
+	return -EBADE;
 }
 
-int get_entry(const struct nvram_node* node)
+char* nvram_list_get(const struct nvram_list* list, const char* key)
 {
+	struct nvram_node* cur = list->entry;
+	while(cur) {
+		if (!strcmp(key, cur->key)) {
+			return cur->value;
+		}
+	}
 
+	return NULL;
 }
 
-int remove_entry(struct nvram_node* node, )
-*/
+int nvram_list_remove(struct nvram_list* list, const char* key)
+{
+	struct nvram_node* cur = list->entry;
+	struct nvram_node* prev = cur;
+	struct nvram_node* next = NULL;
+	while (cur) {
+		next = cur->next;
+		if (!strcmp(key, cur->key)) {
+			destroy_nvram_node(cur);
+			prev->next = next;
+			return 1;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+
+	return 0;
+}
+
 int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len, uint32_t* counter)
 {
 	if (len < NVRAM_HEADER_SIZE) {
@@ -298,11 +336,11 @@ int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint
 		}
 
 		if(cur) {
-			cur->next = create_nvram_node(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
+			cur->next = create_nvram_node_raw(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
 			cur = cur->next;
 		}
 		else {
-			cur = create_nvram_node(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
+			cur = create_nvram_node_raw(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
 		}
 
 		if (!cur) {

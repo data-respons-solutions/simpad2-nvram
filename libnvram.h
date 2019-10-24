@@ -30,6 +30,47 @@ struct nvram_list {
 };
 
 /*
+ * Set value for key in list
+ *
+ * @params
+ *   list: list containing entries
+ *   key: key of entry
+ *   value: value of entry
+ *
+ * @returns
+ *   0 for success
+ *   negative errno for error
+ */
+
+int nvram_list_set(struct nvram_list* list, const char* key, const char* value);
+
+/*
+ * Get value with key from list
+ *
+ * @params
+ *   list: list containing entries
+ *   key: key of entry
+ *
+ * @returns
+ *   Pointer to char string in list
+ *   NULL if not found
+ */
+char* nvram_list_get(const struct nvram_list* list, const char* key);
+
+/*
+ * Remove value with key from list
+ *
+ * @params
+ * 	list: list containing entries
+ *  key: key of entry
+ *
+ * @returns
+ * 1 if removed, 0 if not found
+ */
+
+int nvram_list_remove(struct nvram_list* list, const char* key);
+
+/*
  * Destroy nvram list
  *
  * @params
