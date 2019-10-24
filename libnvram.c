@@ -18,6 +18,32 @@
 #define error(fmt, ...) \
 		do { if (DEBUG) printf("ERROR %s: " fmt, __func__, ##__VA_ARGS__); } while (0)
 
+// Size of counter, len and crc32
+#define NVRAM_HEADER_COUNTER_OFFSET 0
+#define NVRAM_HEADER_SIZE_OFFSET 4
+#define NVRAM_HEADER_CRC32_OFFSET 8
+#define NVRAM_HEADER_DATA_OFFSET 12
+#define NVRAM_HEADER_SIZE sizeof(uint32_t) * 3
+#define NVRAM_MIN_SIZE NVRAM_HEADER_SIZE + NVRAM_ENTRY_MIN_SIZE
+
+/*
+ * Serialized nvram entry is stored as key/value entries in format:
+ *
+ * key_len|value_len|key|value
+ *
+ * uint32_t key_len = Length of key string
+ * uint32_t value_len = Lenght of value string
+ * uint8_t[] key = Key string NOT including null terminator
+ * uint8_t[] value = Value string NOT including null terminator
+ */
+#define NVRAM_ENTRY_KEY_LEN_OFFSET 0
+#define NVRAM_ENTRY_VALUE_LEN_OFFSET 4
+#define NVRAM_ENTRY_DATA_OFFSET 8
+// Size of key_len and value_len
+#define NVRAM_ENTRY_HEADER_SIZE sizeof(uint32_t) * 2
+//Minimum possible size of an entry where both key and value are 1 char each
+#define NVRAM_ENTRY_MIN_SIZE NVRAM_ENTRY_HEADER_SIZE + 2
+
 /*
  * Little endian to host
  *
@@ -95,18 +121,19 @@ create_nvram_node(const uint8_t* data, uint32_t key_len, uint32_t value_len)
 	return node;
 }
 
-void destroy_nvram_node(struct nvram_node* node)
-{
-	if (node) {
-		if (node->next) {
-			destroy_nvram_node(node->next);
-		}
-		free(node);
-		node = NULL;
-	}
-}
-
-int is_valid_nvram_entry(const uint8_t* data, uint32_t max_len, uint32_t* key_len, uint32_t* value_len)
+/*
+ * Verify buffer contains valid nvram entry
+ *
+ * @params
+ *   data: data buffer
+ *   max_len: LengtH of buffer
+ *   key_len: Returns length of key
+ *   value_len: Returns length of value
+ *
+ * @returns
+ *   0 for invalid, 1 for valid
+ */
+static int is_valid_nvram_entry(const uint8_t* data, uint32_t max_len, uint32_t* key_len, uint32_t* value_len)
 {
 	if (!data) {
 		debug("empty data\n");
@@ -133,89 +160,52 @@ int is_valid_nvram_entry(const uint8_t* data, uint32_t max_len, uint32_t* key_le
 	return 1;
 }
 
-int nvram_serialize (struct nvram_node* const node, uint8_t** data, uint32_t* len)
+/* Fill nvram entry to buffer and return size used */
+static uint32_t fill_nvram_entry(uint8_t* data, const char* key, const char* value)
 {
-	if (!node) {
-		debug("node empty\n");
-		return -EINVAL;
-	}
+	const uint32_t key_len = strlen(key);
+	const uint32_t le_key_len = u32tole(key_len);
+	const uint32_t value_len = strlen(value);
+	const uint32_t le_value_len = u32tole(value_len);
+	memcpy(data + NVRAM_ENTRY_KEY_LEN_OFFSET, &le_key_len, sizeof(le_key_len));
+	memcpy(data + NVRAM_ENTRY_VALUE_LEN_OFFSET, &le_value_len, sizeof(le_value_len));
+	memcpy(data + NVRAM_ENTRY_DATA_OFFSET, key, key_len);
+	memcpy(data + NVRAM_ENTRY_DATA_OFFSET + key_len, value, value_len);
 
-	if (*data) {
-		debug("data not empty\n");
-		return -EINVAL;
-	}
-
-	// get needed buf size
-	uint32_t sz = 0;
-	struct nvram_node* cur = node;
-	while (cur) {
-		sz += NVRAM_ENTRY_HEADER_SIZE + strlen(cur->key) + strlen(cur->value);
-		cur = cur->next;
-	}
-	debug("allocating buffer: %" PRIu32 "b\n", sz);
-	uint8_t* buf = malloc(sz);
-	if (!buf) {
-		debug("Malloc failed\n");
-		return -ENOMEM;
-	}
-
-	cur = node;
-	for (uint32_t i = 0; cur; cur = cur->next) {
-		uint32_t key_len = u32tole(strlen(cur->key));
-		uint32_t value_len = u32tole(strlen(cur->value));
-		memcpy(buf + i, &key_len, sizeof(key_len));
-		memcpy(buf + i + sizeof(key_len), &value_len, sizeof(value_len));
-		memcpy(buf + i + sizeof(key_len) + sizeof(value_len), cur->key, key_len);
-		memcpy(buf + i + sizeof(key_len) + sizeof(value_len) + key_len, cur->value, value_len);
-		i += sizeof(key_len) + sizeof(value_len) + key_len + value_len;
-	}
-
-	*data = buf;
-	*len = sz;
-
-	return 0;
+	return key_len + value_len + NVRAM_ENTRY_HEADER_SIZE;
 }
 
-int nvram_deserialize(struct nvram_node** node, const uint8_t* buf, uint32_t len)
+/* Calculate size needed for all entries in linked node */
+static uint32_t calc_serialized_entries_size(const struct nvram_node* node)
 {
-	if (*node) {
-		debug("node not empty\n");
-		return -EINVAL;
+	uint32_t size = 0;
+	while(node) {
+		size += NVRAM_ENTRY_HEADER_SIZE + strlen(node->key) + strlen(node->value);
+		node = node->next;
 	}
+	return size;
+}
 
-	struct nvram_node* new = NULL;
-	struct nvram_node* cur = NULL;
+/* Fill nvram header */
+static void fill_nvram_header(uint8_t* data, uint32_t counter, uint32_t data_size)
+{
+	const uint32_t le_counter = u32tole(counter);
+	const uint32_t le_data_size = u32tole(data_size);
+	const uint32_t le_crc32 = u32tole(calc_crc32(0, data + NVRAM_HEADER_SIZE, data_size));
+	memcpy(data + NVRAM_HEADER_COUNTER_OFFSET, &le_counter, sizeof(le_counter));
+	memcpy(data + NVRAM_HEADER_SIZE_OFFSET, &le_data_size, sizeof(le_data_size));
+	memcpy(data + NVRAM_HEADER_CRC32_OFFSET, &le_crc32, sizeof(le_crc32));
+}
 
-	for (uint32_t i = 0; i < len;) {
-		uint32_t remaining = (i > len) ? i - len : len - i;
-		uint32_t key_len = 0;
-		uint32_t value_len = 0;
-		if (!is_valid_nvram_entry(buf + i, remaining, &key_len, &value_len)) {
-			return -EINVAL;
+void destroy_nvram_node(struct nvram_node* node)
+{
+	if (node) {
+		if (node->next) {
+			destroy_nvram_node(node->next);
 		}
-
-		if(cur) {
-			cur->next = create_nvram_node(buf + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
-			cur = cur->next;
-		}
-		else {
-			cur = create_nvram_node(buf + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
-		}
-
-		if (!cur) {
-			debug("Failed creating node\n");
-			return -ENOMEM;
-		}
-
-		if (!new) {
-			new = cur;
-		}
-		i += NVRAM_ENTRY_HEADER_SIZE + key_len + value_len;
+		free(node);
+		node = NULL;
 	}
-
-	*node = new;
-
-	return 0;
 }
 
 int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len, uint32_t* counter)
@@ -244,4 +234,78 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 	*counter = _counter;
 
 	return 1;
+}
+
+int nvram_section_deserialize(struct nvram_node** node, const uint8_t* data, uint32_t len)
+{
+	if (!data) {
+		debug("data empty\n");
+		return -EINVAL;
+	}
+	if (len < NVRAM_MIN_SIZE) {
+		//debug("len(%" PRIu32 ") smaller than NVRAM_MIN_SIZE(%" PRIu32 ")\n", len, NVRAM_MIN_SIZE);
+		return -EINVAL;
+	}
+
+	struct nvram_node* new = NULL;
+	struct nvram_node* cur = NULL;
+	for (uint32_t i = NVRAM_HEADER_SIZE; i < len;) {
+		uint32_t remaining = (i > len) ? i - len : len - i;
+		uint32_t key_len = 0;
+		uint32_t value_len = 0;
+		if (!is_valid_nvram_entry(data + i, remaining, &key_len, &value_len)) {
+			return -EINVAL;
+		}
+
+		if(cur) {
+			cur->next = create_nvram_node(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
+			cur = cur->next;
+		}
+		else {
+			cur = create_nvram_node(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
+		}
+
+		if (!cur) {
+			debug("Failed creating node\n");
+			return -ENOMEM;
+		}
+
+		if (!new) {
+			new = cur;
+		}
+		i += NVRAM_ENTRY_HEADER_SIZE + key_len + value_len;
+	}
+
+	*node = new;
+
+	return 0;
+}
+
+int nvram_section_serialize(struct nvram_node* const node, uint32_t counter, uint8_t** data, uint32_t* len)
+{
+	if (!node) {
+		debug("node empty\n");
+		return -EINVAL;
+	}
+
+	const uint32_t data_len = calc_serialized_entries_size(node);
+	const uint32_t buf_len = NVRAM_HEADER_SIZE + data_len;
+	debug("allocating: %" PRIu32 "b\n", buf_len);
+	uint8_t* buf = malloc(buf_len);
+	if (!buf) {
+		debug("malloc failed\n");
+		return -ENOMEM;
+	}
+
+	struct nvram_node* cur = node;
+	for (uint32_t i = NVRAM_HEADER_SIZE; cur; cur = cur->next) {
+		i += fill_nvram_entry(buf + i, cur->key, cur->value);
+	}
+
+	fill_nvram_header(buf, counter, data_len);
+
+	*data = buf;
+	*len = buf_len;
+
+	return 0;
 }
