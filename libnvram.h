@@ -14,6 +14,16 @@
  * uint32_t len = Length of serialized data
  * uint32_t crc32 = crc32 for serialized data
  * uint8_t[] data = serialized data
+ *
+ *
+ *
+ * Serialized data is stored as key/value entries in format:
+ * key_len|value_len|key|value
+ *
+ * uint32_t key_len = Length of key string
+ * uint32_t value_len = Lenght of value string
+ * uint8_t[] key = Key string NOT including null terminator
+ * uint8_t[] value = Value string NOT including null terminator
  */
 
 // Parsed nvram data stored as linked nodes
