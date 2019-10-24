@@ -218,13 +218,14 @@ int nvram_deserialize(struct nvram_node** node, const uint8_t* buf, uint32_t len
 	return 0;
 }
 
-int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len)
+int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len, uint32_t* counter)
 {
 	if (len < NVRAM_HEADER_SIZE) {
 		debug("data too small\n");
 		return 0;
 	}
 
+	const uint32_t _counter = letou32(data);
 	const uint32_t _data_len = letou32(data + 4);
 	const uint32_t _data_crc32 = letou32(data + 8);
 
@@ -240,6 +241,7 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 	}
 
 	*data_len = _data_len;
+	*counter = _counter;
 
 	return 1;
 }

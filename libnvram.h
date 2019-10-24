@@ -98,11 +98,12 @@ int nvram_deserialize(struct nvram_node** node, const uint8_t* buf, uint32_t len
  *   data: data buffer
  *   max_len: Length of buffer
  *   data_len: returns length of serialized data
+ *   counter: returns nvram section header counter
  *
  * @returns
  *   0 for invalid, 1 for valid
  */
 
-int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len);
+int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len, uint32_t* counter);
 
 #endif // _LIBNVRAM_H_
