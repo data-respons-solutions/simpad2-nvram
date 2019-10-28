@@ -118,18 +118,31 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint32_t len);
 
 /*
+ * Returns size needed for serialized buffer
+ *
+ * @params
+ *   list: list with entires
+ *   size: returns buffer size needed
+ *
+ * @returns
+ *   0 for success
+ *   Negative errno for error
+ */
+int nvram_section_serialize_size(const struct nvram_list* list, uint32_t* size);
+
+/*
  * Create serialized data buffer from nodes
  *
  * @params
  *  list: list with entries
  *  counter: Value of counter to insert into section header
- *  data: Returned data buffer
- *  len:  Returned data buffer length
+ *  data: data buffer
+ *  size: size of buffer
  *
  * @returns
  *  0 for success
  *  Negative errno for error
  */
-int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t** data, uint32_t* len);
+int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t* data, uint32_t size);
 
 #endif // _LIBNVRAM_H_

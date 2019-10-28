@@ -138,12 +138,26 @@ static int test_nvram_serialize()
 {
 	int ret = 0;
 	uint8_t* data = NULL;
-	uint32_t size = 0;
+
 	struct nvram_list list = NVRAM_LIST_INITIALIZER;
 	list.entry = &test_node1;
-	ret = nvram_section_serialize(&list, 0x10, &data, &size);
-	if (ret) {
-		printf("Serialize failed: %s\n", strerror(-ret));
+
+	uint32_t size = 0;
+	ret = nvram_section_serialize_size(&list, &size);
+	if (ret < 0) {
+		printf("nvram_section_serialize_size failed: %s\n", strerror(-ret));
+		goto error_exit;
+	}
+
+	data = malloc(size);
+	if (!data) {
+		printf("malloc failed\n");
+		goto error_exit;
+	}
+
+	ret = nvram_section_serialize(&list, 0x10, data, size);
+	if (ret < 0) {
+		printf("nvram_section_serialize failed: %s\n", strerror(-ret));
 		goto error_exit;
 	}
 

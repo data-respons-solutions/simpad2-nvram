@@ -344,7 +344,7 @@ int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint
 	return 0;
 }
 
-int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t** data, uint32_t* len)
+int nvram_section_serialize_size(const struct nvram_list* list, uint32_t* size)
 {
 	if (!list) {
 		debug("list empty\n");
@@ -353,22 +353,32 @@ int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uin
 
 	const uint32_t data_len = calc_serialized_entries_size(list->entry);
 	const uint32_t buf_len = NVRAM_HEADER_SIZE + data_len;
-	debug("allocating: %" PRIu32 "b\n", buf_len);
-	uint8_t* buf = malloc(buf_len);
-	if (!buf) {
-		debug("malloc failed\n");
-		return -ENOMEM;
+
+	*size = buf_len;
+
+	return 0;
+}
+
+int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t* data, uint32_t size)
+{
+	if (!list) {
+		debug("list empty\n");
+		return -EINVAL;
+	}
+
+	const uint32_t data_len = calc_serialized_entries_size(list->entry);
+	const uint32_t buf_len = NVRAM_HEADER_SIZE + data_len;
+	if (size < buf_len) {
+		debug("data buffer too small\n");
+		return -EINVAL;
 	}
 
 	struct nvram_node* cur = list->entry;
 	for (uint32_t i = NVRAM_HEADER_SIZE; cur; cur = cur->next) {
-		i += fill_nvram_entry(buf + i, cur->key, cur->value);
+		i += fill_nvram_entry(data + i, cur->key, cur->value);
 	}
 
-	fill_nvram_header(buf, counter, data_len);
-
-	*data = buf;
-	*len = buf_len;
+	fill_nvram_header(data, counter, data_len);
 
 	return 0;
 }
