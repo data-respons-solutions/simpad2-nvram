@@ -310,11 +310,6 @@ int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint
 		return -EINVAL;
 	}
 
-	if (len < NVRAM_MIN_SIZE) {
-		//debug("len(%" PRIu32 ") smaller than NVRAM_MIN_SIZE(%" PRIu32 ")\n", len, NVRAM_MIN_SIZE);
-		return -EINVAL;
-	}
-
 	struct nvram_node* new = NULL;
 	struct nvram_node* cur = NULL;
 	for (uint32_t i = NVRAM_HEADER_SIZE; i < len;) {
