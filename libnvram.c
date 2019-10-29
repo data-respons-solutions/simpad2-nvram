@@ -10,7 +10,9 @@
 #include "crc32.h"
 
 
-#define DEBUG 1
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
 #define debug(fmt, ...) \
 		do { if (DEBUG) printf("DEBUG %s: " fmt, __func__, ##__VA_ARGS__); } while (0)
