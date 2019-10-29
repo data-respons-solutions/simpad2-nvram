@@ -1,6 +1,10 @@
 #ifndef _LIBNVRAM_H_
 #define _LIBNVRAM_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <inttypes.h>
 #include "crc32.h"
@@ -144,5 +148,9 @@ int nvram_section_serialize_size(const struct nvram_list* list, uint32_t* size);
  *  Negative errno for error
  */
 int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t* data, uint32_t size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _LIBNVRAM_H_
