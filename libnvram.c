@@ -227,6 +227,9 @@ int nvram_list_set(struct nvram_list* list, const char* key, const char* value)
 {
 	if (!list->entry) {
 		list->entry = create_nvram_node_str(key, value);
+		if (!list->entry) {
+			return -ENOMEM;
+		}
 		return 0;
 	}
 
@@ -250,6 +253,11 @@ int nvram_list_set(struct nvram_list* list, const char* key, const char* value)
 		}
 		prev = cur;
 		cur = cur->next;
+	}
+
+	prev->next = create_nvram_node_str(key, value);
+	if (!prev->next) {
+		return -ENOMEM;
 	}
 
 	return 0;
