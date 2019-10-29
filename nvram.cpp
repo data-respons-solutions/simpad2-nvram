@@ -16,73 +16,10 @@
 #define STRINGIFY(x) #x
 
 #ifdef TARGET_MTD
-#include <mtd/libmtd.h>
-const char *vpd_mtd_label = XSTR(VPD_MTD_LABEL);
-const char *vpd_mtd_gpio = XSTR(VPD_MTD_GPIO);
-
-static int find_mtd(const char* label, int* mtd_num, long long* mtd_size)
-{
-	libmtd_t mtd = nullptr;
-	struct mtd_dev_info *mtd_dev = nullptr;
-	struct mtd_info *mtd_info = nullptr;
-	int status = -1;
-
-	mtd = libmtd_open();
-		if (!mtd) {
-			switch (errno) {
-			case 0:
-				std::cerr<< "mtd subsystem not available" << " - exiting\n";
-				goto errorexit;
-			default:
-				std::cerr<< "libmtd_open:  " << std::strerror(errno)  << " - exiting\n";
-				goto errorexit;
-			}
-		}
-
-		mtd_info = (struct mtd_info*) malloc(sizeof(struct mtd_info));
-		if (mtd_get_info(mtd, mtd_info)) {
-			std::cerr<< "mtd_get_info " << std::strerror(errno)  << " - exiting\n";
-			goto errorexit;
-
-		}
-
-		mtd_dev = (struct mtd_dev_info*) malloc(sizeof(struct mtd_dev_info));
-		for (int i = mtd_info->lowest_mtd_num; i <= mtd_info->highest_mtd_num; ++i) {
-			if (mtd_get_dev_info1(mtd, i, mtd_dev)) {
-				std::cerr<< "mtd_get_dev_info(node: " << i << "): " << std::strerror(errno)  << " - exiting\n";
-				goto errorexit;
-			}
-
-			if (!strcmp(mtd_dev->name, label)) {
-				*mtd_num = mtd_dev->mtd_num;
-				*mtd_size = mtd_dev->size;
-				break;
-			}
-
-			if (i == mtd_info->highest_mtd_num) {
-				std::cerr << "find_mtd: device with label: \"" << label << "\": not found - exiting\n";
-				goto errorexit;
-			}
-		}
-
-	status = 0;
-
-errorexit:
-	if (mtd) {
-		libmtd_close(mtd);
-		mtd = nullptr;
-	}
-	if (mtd_dev) {
-		free(mtd_dev);
-		mtd_dev = nullptr;
-	}
-
-	if (mtd_info) {
-		free(mtd_info);
-		mtd_info = nullptr;
-	}
-	return status;
-}
+#include "mtdvpd.h"
+const char *vpd_mtd_label_a = XSTR(VPD_MTD_LABEL_A);
+const char *vpd_mtd_label_b = XSTR(VPD_MTD_LABEL_B);
+const char *vpd_mtd_wp = XSTR(VPD_MTD_WP);
 #endif
 
 #ifdef TARGET_LEGACY
@@ -157,37 +94,58 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 #elif defined(TARGET_MTD)
-	VPD vpd(true);
+	VPD vpd;
 
-	std::string mtd_label = vpd_mtd_label;
-	char *elabel = getenv("VPD_MTD_LABEL");
-		if (elabel)
-			mtd_label = elabel;
+	std::string mtd_label_a = vpd_mtd_label_a;
+	char *elabel_a = getenv("VPD_MTD_LABEL_A");
+		if (elabel_a)
+			mtd_label_a = elabel_a;
 
-	int mtd_num = -1;
-	long long mtd_size = -1;
-	if (find_mtd(mtd_label.c_str(), &mtd_num, &mtd_size)) {
+	std::string mtd_label_b = vpd_mtd_label_b;
+	char *elabel_b = getenv("VPD_MTD_LABEL_B");
+		if (elabel_b)
+			mtd_label_b = elabel_b;
+
+	int mtd_num_a = -1;
+	long long mtd_size_a = -1;
+	if (find_mtd(mtd_label_a.c_str(), &mtd_num_a, &mtd_size_a)) {
+		return -1;
+	}
+
+	int mtd_num_b = -1;
+	long long mtd_size_b = -1;
+	if (find_mtd(mtd_label_b.c_str(), &mtd_num_b, &mtd_size_b)) {
 		return -1;
 	}
 
 	struct stat buf;
-	std::string mtd_path = "/dev/mtd" + std::to_string(mtd_num);
-	ret = stat(mtd_path.c_str(), &buf);
+	std::string mtd_path_a = "/dev/mtd" + std::to_string(mtd_num_a);
+	ret = stat(mtd_path_a.c_str(), &buf);
 	if (ret == 0 && !S_ISCHR(buf.st_mode))
 	{
-		std::cerr << "mtd file path invalid: " << mtd_path << " - exiting\n";
+		std::cerr << "mtd file path invalid: " << mtd_path_a << " - exiting\n";
 		return -1;
 	}
 
-	std::string mtd_gpio = vpd_mtd_gpio;
-	char *egpio = getenv("VPD_MTD_GPIO");
+	std::string mtd_path_b = "/dev/mtd" + std::to_string(mtd_num_b);
+	ret = stat(mtd_path_b.c_str(), &buf);
+	if (ret == 0 && !S_ISCHR(buf.st_mode))
+	{
+		std::cerr << "mtd file path invalid: " << mtd_path_b << " - exiting\n";
+		return -1;
+	}
+
+	std::string mtd_gpio = vpd_mtd_wp;
+	char *egpio = getenv("VPD_MTD_WP");
 		if (egpio)
 			mtd_gpio = egpio;
 
-	userStorage = new EepromVpdNoFS(mtd_path, mtd_size, mtd_gpio);
+	MtdVpd* userMtdStorage = new MtdVpd(mtd_path_a, mtd_size_a , mtd_path_b, mtd_size_b);
+	userMtdStorage->set_wp_gpio(mtd_gpio);
+	userStorage = userMtdStorage;
 	if (!vpd.load(userStorage))
 	{
-		std::cerr << "nvram: unable to load data from " << mtd_path << std::endl;
+		std::cerr << "nvram: unable to load data" << std::endl;
 		delete userStorage;
 		return -1;
 	}

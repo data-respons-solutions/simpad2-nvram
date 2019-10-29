@@ -1,15 +1,17 @@
 
 INSTALL_PATH ?= /usr/sbin
 
-VPD_EEPROM_PATH ?= /dev/mtd1
-VPD_MTD_LABEL ?= user
+VPD_EEPROM_PATH ?= "/dev/mtd1"
+VPD_MTD_LABEL_A ?= "user_a"
+VPT_MTD_LABEL_B ?= "user_b"
+VPD_MTD_WP ?= "gpio101"
 
 CXX ?= g++
 CXXFLAGS += -std=c++11 
 CXXFLAGS_FILE = -DTARGET_FILE
 CXXFLAGS_EFI = -DTARGET_EFI
 CXXFLAGS_LEGACY = -DTARGET_LEGACY -DVPD_EEPROM_PATH=$(VPD_EEPROM_PATH)
-CXXFLAGS_MTD = -DTARGET_MTD -DVPD_MTD_LABEL=$(VPD_MTD_LABEL) -DVPD_MTD_GPIO=$(VPD_MTD_GPIO)
+CXXFLAGS_MTD = -DTARGET_MTD -DVPD_MTD_LABEL_A=$(VPD_MTD_LABEL_A) -DVPD_MTD_LABEL_B=$(VPT_MTD_LABEL_B) -DVPD_MTD_WP=$(VPD_MTD_WP)
 
 COMMON_OBJS := vpd.o
 $(COMMON_OBJS): vpd.h vpdstorage.h crc32.h eeprom_vpd.h eeprom_vpd_nofs.h efivpd.h filevpd.h Makefile
@@ -38,9 +40,13 @@ nvram_efi : $(COMMON_OBJS) nvram_efi.o efivpd.o
 nvram_legacy : $(COMMON_OBJS) nvram_legacy.o eeprom_vpd.o crc32.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 	
-nvram_mtd : $(COMMON_OBJS) nvram_mtd.o eeprom_vpd_nofs.o crc32.o
+nvram_mtd : $(COMMON_OBJS) nvram_mtd.o mtdvpd.o libnvram/libnvram.a
 	$(CXX) -o $@ $^ $(LDFLAGS) -lmtd
-	
+
+.PHONY: libnvram/libnvram.a
+libnvram/libnvram.a:
+	make -C libnvram
+
 install:
 	install -m 0755 -D nvram_file $(INSTALL_PATH)/nvram_file
 	install -m 0755 -D nvram_efi $(INSTALL_PATH)/nvram_efi
@@ -49,3 +55,4 @@ install:
 
 clean:
 	rm -f *.o nvram_file nvram_efi nvram_legacy nvram_mtd
+	make -C libnvram clean
