@@ -100,10 +100,11 @@ create_nvram_node(const uint8_t* key, uint32_t key_len, const uint8_t* value, ui
 
 	node->key = (char*) node + sizeof(struct nvram_node);
 	memcpy(node->key, (char*) key, key_len);
-	node->key[key_str_len] = '\0';
+	memset(node->key + key_len, '\0', 1);
+
 	node->value = (char*) node + sizeof(struct nvram_node) + key_str_len;
 	memcpy(node->value, (char*) value, value_len);
-	node->value[value_str_len] = '\0';
+	memset(node->value + value_len, '\0', 1);
 	node->next = NULL;
 
 	debug("new: %s = %s\n", node->key, node->value);
@@ -174,7 +175,8 @@ static uint32_t fill_nvram_entry(uint8_t* data, const char* key, const char* val
 	memcpy(data + NVRAM_ENTRY_DATA_OFFSET, key, key_len);
 	memcpy(data + NVRAM_ENTRY_DATA_OFFSET + key_len, value, value_len);
 
-	return key_len + value_len + NVRAM_ENTRY_HEADER_SIZE;
+	const uint32_t entry_size = key_len + value_len + NVRAM_ENTRY_HEADER_SIZE;
+	return entry_size;
 }
 
 /* Calculate size needed for all entries in linked node */
@@ -223,21 +225,34 @@ void destroy_nvram_list(struct nvram_list* list)
 
 int nvram_list_set(struct nvram_list* list, const char* key, const char* value)
 {
-	nvram_list_remove(list, key);
-
-	struct nvram_node* cur = list->entry;
-	while(cur) {
-		if(!cur->next) {
-			cur->next = create_nvram_node_str(key, value);
-			if (cur->next) {
-				return 0;
-			}
-			debug("malloc failed\n");
-			return -ENOMEM;
-		}
+	if (!list->entry) {
+		list->entry = create_nvram_node_str(key, value);
+		return 0;
 	}
 
-	return -EBADE;
+	struct nvram_node* cur = list->entry;
+	struct nvram_node* prev = cur;
+	struct nvram_node* next = NULL;
+	while (cur) {
+		next = cur->next;
+		if (!strcmp(key, cur->key)) {
+			if (!strcmp(value, cur->value)) {
+				return 0;
+			}
+			struct nvram_node* new = create_nvram_node_str(key, value);
+			if (!new) {
+				return -ENOMEM;
+			}
+			prev->next = new;
+			new->next = next;
+			destroy_nvram_node(cur);
+			return 0;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+
+	return 0;
 }
 
 char* nvram_list_get(const struct nvram_list* list, const char* key)
@@ -298,7 +313,7 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 		return 0;
 	}
 
-	*data_len = _data_len;
+	*data_len = _data_len + NVRAM_HEADER_SIZE;
 	*counter = _counter;
 
 	return 1;
