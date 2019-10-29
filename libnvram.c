@@ -282,6 +282,11 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 	const uint32_t _data_len = letou32(data + 4);
 	const uint32_t _data_crc32 = letou32(data + 8);
 
+	if (UINT32_MAX - NVRAM_HEADER_SIZE < _data_len)  {
+		debug("header defined data[%" PRIu32 "] too large\n", _data_len);
+		return 0;
+	}
+
 	if (len < NVRAM_HEADER_SIZE + _data_len) {
 		debug("header defines length[%" PRIu32 "] longer than buffer[%" PRIu32 "]\n", (uint32_t) NVRAM_HEADER_SIZE + _data_len, len);
 		return 0;
