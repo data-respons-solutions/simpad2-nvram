@@ -5,10 +5,11 @@
 extern "C" {
 #endif
 
+#ifndef __UBOOT__
 #include <stdint.h>
 #include <inttypes.h>
+#endif
 #include "crc32.h"
-
 /*
  * Serialized data is stored on nvram in two separate sections where section format is:
  *

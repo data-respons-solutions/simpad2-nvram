@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2019 Data Respons Solutions AB
+ *
+ * Author: Mikko Salomäki <ms@datarespons.se>
+ *
+ * SPDX-License-Identifier:	MIT
+ */
+#ifdef __UBOOT__
+#include <common.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <linux/types.h>
+#else
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,20 +18,18 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <unistd.h>
-
+#endif
 #include "libnvram.h"
 #include "crc32.h"
-
 
 #ifndef DEBUG
 #define DEBUG 0
 #endif
 
+#ifndef debug
 #define debug(fmt, ...) \
 		do { if (DEBUG) printf("DEBUG %s: " fmt, __func__, ##__VA_ARGS__); } while (0)
-
-#define error(fmt, ...) \
-		do { if (DEBUG) printf("ERROR %s: " fmt, __func__, ##__VA_ARGS__); } while (0)
+#endif
 
 // Size of counter, len and crc32
 #define NVRAM_HEADER_COUNTER_OFFSET 0

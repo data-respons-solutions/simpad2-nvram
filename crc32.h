@@ -1,7 +1,12 @@
 #ifndef _CRC32_H_
 #define _CRC32_H_
 
+#ifdef __UBOOT__
+#include <linux/types.h>
+#else
 #include <stdint.h>
+#endif
+
 /*
   This file is derived from crc32.c from the u-boot source tree which in turn has
   derived it's code from the crc32.c from the zlib-1.1.3 distribution
