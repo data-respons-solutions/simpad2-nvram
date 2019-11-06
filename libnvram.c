@@ -283,6 +283,7 @@ char* nvram_list_get(const struct nvram_list* list, const char* key)
 		if (!strcmp(key, cur->key)) {
 			return cur->value;
 		}
+		cur = cur->next;
 	}
 
 	return NULL;
