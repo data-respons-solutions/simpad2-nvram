@@ -22,14 +22,14 @@
 #include "libnvram.h"
 #include "crc32.h"
 
-#ifndef DEBUG
-#define DEBUG 0
+#ifdef DEBUG
+#define LIBDEBUG 1
+#else
+#define LIBDEBUG 0
 #endif
 
-#ifndef debug
-#define debug(fmt, ...) \
-		do { if (DEBUG) printf("DEBUG %s: " fmt, __func__, ##__VA_ARGS__); } while (0)
-#endif
+#define libdebug(fmt, ...) \
+		do { if (LIBDEBUG) printf("DEBUG %s: " fmt, __func__, ##__VA_ARGS__); } while (0)
 
 // Size of counter, len and crc32
 #define NVRAM_HEADER_COUNTER_OFFSET 0
@@ -107,7 +107,7 @@ create_nvram_node(const uint8_t* key, uint32_t key_len, const uint8_t* value, ui
 	const size_t sz = key_str_len + value_str_len + sizeof(struct nvram_node);
 	struct nvram_node* node = malloc(sz);
 	if (!node) {
-		debug("malloc failed\n");
+		libdebug("malloc failed\n");
 		return NULL;
 	}
 
@@ -120,7 +120,7 @@ create_nvram_node(const uint8_t* key, uint32_t key_len, const uint8_t* value, ui
 	memset(node->value + value_len, '\0', 1);
 	node->next = NULL;
 
-	debug("new: %s = %s\n", node->key, node->value);
+	libdebug("new: %s = %s\n", node->key, node->value);
 
 	return node;
 }
@@ -152,12 +152,12 @@ create_nvram_node_raw(const uint8_t* data, uint32_t key_len, uint32_t value_len)
 static int is_valid_nvram_entry(const uint8_t* data, uint32_t max_len, uint32_t* key_len, uint32_t* value_len)
 {
 	if (!data) {
-		debug("empty data\n");
+		libdebug("empty data\n");
 		return 0;
 	}
 
 	if (max_len < NVRAM_ENTRY_MIN_SIZE) {
-		debug("data too small to fit one entry\n");
+		libdebug("data too small to fit one entry\n");
 		return 0;
 	}
 
@@ -165,7 +165,7 @@ static int is_valid_nvram_entry(const uint8_t* data, uint32_t max_len, uint32_t*
 	const uint32_t _value_len = letou32(data + 4);
 	const uint32_t required_len = _key_len + _value_len + NVRAM_ENTRY_HEADER_SIZE;
 	if (required_len > max_len) {
-		debug("defined length [%" PRIu32 "] longer than buffer [%" PRIu32 "]\n",
+		libdebug("defined length [%" PRIu32 "] longer than buffer [%" PRIu32 "]\n",
 				required_len, max_len);
 		return 0;
 	}
@@ -310,7 +310,7 @@ int nvram_list_remove(struct nvram_list* list, const char* key)
 int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len, uint32_t* counter)
 {
 	if (len < NVRAM_HEADER_SIZE) {
-		debug("data too small\n");
+		libdebug("data too small\n");
 		return 0;
 	}
 
@@ -319,18 +319,18 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 	const uint32_t _data_crc32 = letou32(data + 8);
 
 	if (UINT32_MAX - NVRAM_HEADER_SIZE < _data_len)  {
-		debug("header defined data[%" PRIu32 "] too large\n", _data_len);
+		libdebug("header defined data[%" PRIu32 "] too large\n", _data_len);
 		return 0;
 	}
 
 	if (len < NVRAM_HEADER_SIZE + _data_len) {
-		debug("header defines length[%" PRIu32 "] longer than buffer[%" PRIu32 "]\n", (uint32_t) NVRAM_HEADER_SIZE + _data_len, len);
+		libdebug("header defines length[%" PRIu32 "] longer than buffer[%" PRIu32 "]\n", (uint32_t) NVRAM_HEADER_SIZE + _data_len, len);
 		return 0;
 	}
 
 	uint32_t crc32 = calc_crc32(0, data + NVRAM_HEADER_SIZE, _data_len);
 	if (crc32 != _data_crc32) {
-		debug("crc32 mismatch: 0x%" PRIx32" != 0x%" PRIx32 "\n", crc32, _data_crc32);
+		libdebug("crc32 mismatch: 0x%" PRIx32" != 0x%" PRIx32 "\n", crc32, _data_crc32);
 		return 0;
 	}
 
@@ -343,11 +343,11 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint32_t len)
 {
 	if (!data) {
-		debug("data empty\n");
+		libdebug("data empty\n");
 		return -EINVAL;
 	}
 	if (list->entry) {
-		debug("list not empty\n");
+		libdebug("list not empty\n");
 		return -EINVAL;
 	}
 
@@ -370,7 +370,7 @@ int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint
 		}
 
 		if (!cur) {
-			debug("Failed creating node\n");
+			libdebug("Failed creating node\n");
 			return -ENOMEM;
 		}
 
@@ -388,7 +388,7 @@ int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint
 int nvram_section_serialize_size(const struct nvram_list* list, uint32_t* size)
 {
 	if (!list) {
-		debug("list empty\n");
+		libdebug("list empty\n");
 		return -EINVAL;
 	}
 
@@ -403,14 +403,14 @@ int nvram_section_serialize_size(const struct nvram_list* list, uint32_t* size)
 int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t* data, uint32_t size)
 {
 	if (!list) {
-		debug("list empty\n");
+		libdebug("list empty\n");
 		return -EINVAL;
 	}
 
 	const uint32_t data_len = calc_serialized_entries_size(list->entry);
 	const uint32_t buf_len = NVRAM_HEADER_SIZE + data_len;
 	if (size < buf_len) {
-		debug("data buffer too small\n");
+		libdebug("data buffer too small\n");
 		return -EINVAL;
 	}
 
