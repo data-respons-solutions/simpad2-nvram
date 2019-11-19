@@ -7,9 +7,7 @@ CFLAGS += -Werror
 CFLAGS += -std=gnu11
 CFLAGS += -pedantic
 
-#LDFLAGS += -lsystemd
-
-all: libnvram-test
+all: libnvram.a
 
 libnvram.a: crc32.o libnvram.o 
 	$(AR) rcs $@ $^
@@ -20,14 +18,9 @@ libnvram-test: libnvram-test.o libnvram.a
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
-#.PHONY: install
-#install:
-#	cp dbus-match $(DESTDIR)$(PREFIX)/bin/dbus-match
-#
-#.PHONY: uninstall
-#uninstall:
-#	rm -f $(DESTDIR)$(PREFIX)/bin/dbus-match
-#
+.PHONY: test
+test: libnvram-test
+
 .PHONY: clean
 clean:
 	rm -f crc32.o
