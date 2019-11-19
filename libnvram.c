@@ -238,39 +238,37 @@ void destroy_nvram_list(struct nvram_list* list)
 
 int nvram_list_set(struct nvram_list* list, const char* key, const char* value)
 {
-	if (!list->entry) {
-		list->entry = create_nvram_node_str(key, value);
-		if (!list->entry) {
-			return -ENOMEM;
-		}
-		return 0;
-	}
-
-	struct nvram_node* cur = list->entry;
-	struct nvram_node* prev = cur;
 	struct nvram_node* next = NULL;
-	while (cur) {
+	struct nvram_node* prev = NULL;
+	struct nvram_node* cur = NULL;
+	for (cur = list->entry; cur; cur = next) {
 		next = cur->next;
 		if (!strcmp(key, cur->key)) {
 			if (!strcmp(value, cur->value)) {
 				return 0;
 			}
-			struct nvram_node* new = create_nvram_node_str(key, value);
-			if (!new) {
-				return -ENOMEM;
-			}
-			prev->next = new;
-			new->next = next;
-			destroy_nvram_node(cur);
-			return 0;
+			// replace node
+			break;
 		}
 		prev = cur;
-		cur = cur->next;
 	}
 
-	prev->next = create_nvram_node_str(key, value);
-	if (!prev->next) {
+	struct nvram_node* new = create_nvram_node_str(key, value);
+	if (!new) {
 		return -ENOMEM;
+	}
+	new->next = next;
+
+	if (!prev) {
+		// create or replace first node
+		if (list->entry) {
+			destroy_nvram_node(list->entry);
+		}
+		list->entry = new;
+	}
+	else {
+		destroy_nvram_node(cur);
+		prev->next = new;
 	}
 
 	return 0;
