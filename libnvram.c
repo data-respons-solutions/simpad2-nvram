@@ -289,18 +289,26 @@ char* nvram_list_get(const struct nvram_list* list, const char* key)
 
 int nvram_list_remove(struct nvram_list* list, const char* key)
 {
-	struct nvram_node* cur = list->entry;
-	struct nvram_node* prev = cur;
 	struct nvram_node* next = NULL;
-	while (cur) {
+	struct nvram_node* prev = NULL;
+	struct nvram_node* cur = NULL;
+	for (cur = list->entry; cur; cur = next) {
 		next = cur->next;
 		if (!strcmp(key, cur->key)) {
-			destroy_nvram_node(cur);
-			prev->next = next;
+			// remove node
+			if (!prev) {
+				// remove first node
+				destroy_nvram_node(list->entry);
+				list->entry = NULL;
+			}
+			else{
+				destroy_nvram_node(cur);
+				prev->next = next;
+			}
 			return 1;
+
 		}
 		prev = cur;
-		cur = cur->next;
 	}
 
 	return 0;
