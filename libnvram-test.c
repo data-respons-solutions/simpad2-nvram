@@ -432,7 +432,7 @@ int main(int argc, char** argv)
 
 	for (int i = 0; test_array[i].name; ++i) {
 		int r = (*test_array[i].func)();
-		if (r) {
+		if (!r) {
 			errors++;
 		}
 		printf("%s: %s\n", test_array[i].name, r ? "PASS" : "FAIL");
