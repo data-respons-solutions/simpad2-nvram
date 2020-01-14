@@ -308,6 +308,101 @@ error_exit:
 	return r;
 }
 
+static int test_nvram_list_remove()
+{
+	const char* test_key1 = "TEST1";
+	const char* test_val1 = "abc";
+
+	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	int r = 0;
+
+	nvram_list_set(&list, test_key1, test_val1);
+	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+		goto error_exit;
+	}
+	nvram_list_remove(&list, test_key1);
+	if (!check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+		goto error_exit;
+	}
+
+	r = 1;
+error_exit:
+	destroy_nvram_list(&list);
+	return r;
+}
+
+static int test_nvram_list_remove_second()
+{
+	const char* test_key1 = "TEST1";
+	const char* test_val1 = "abc";
+	const char* test_key2 = "TEST2";
+	const char* test_val2 = "def";
+
+	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	int r = 0;
+
+	nvram_list_set(&list, test_key1, test_val1);
+	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+		goto error_exit;
+	}
+	nvram_list_set(&list, test_key2, test_val2);
+	if (check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+		goto error_exit;
+	}
+	nvram_list_remove(&list, test_key2);
+	if (!check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+		goto error_exit;
+	}
+
+	r = 1;
+error_exit:
+	destroy_nvram_list(&list);
+	return r;
+}
+
+static int test_nvram_list_remove_middle()
+{
+	const char* test_key1 = "TEST1";
+	const char* test_val1 = "abc";
+	const char* test_key2 = "TEST2";
+	const char* test_val2 = "def";
+	const char* test_key3 = "TEST3";
+	const char* test_val3 = "ghi";
+
+
+	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	int r = 0;
+
+	nvram_list_set(&list, test_key1, test_val1);
+	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+		goto error_exit;
+	}
+	nvram_list_set(&list, test_key2, test_val2);
+	if (check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+		goto error_exit;
+	}
+	nvram_list_set(&list, test_key3, test_val3);
+	if (check_nvram_list_entry(&list, 2, test_key3, test_val3)) {
+		goto error_exit;
+	}
+
+	nvram_list_remove(&list, test_key2);
+	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+		goto error_exit;
+	}
+	if (check_nvram_list_entry(&list, 1, test_key3, test_val3)) {
+		goto error_exit;
+	}
+	if (!check_nvram_list_entry(&list, 2, test_key2, test_val2)) {
+		goto error_exit;
+	}
+
+	r = 1;
+error_exit:
+	destroy_nvram_list(&list);
+	return r;
+}
+
 struct test {
 	char* name;
 	int (*func)(void);
@@ -322,6 +417,9 @@ struct test test_array[] = {
 		{FUNC_NAME(test_nvram_list_set), &test_nvram_list_set},
 		{FUNC_NAME(test_nvram_list_overwrite_first), &test_nvram_list_overwrite_first},
 		{FUNC_NAME(test_nvram_list_overwrite_second), &test_nvram_list_overwrite_second},
+		{FUNC_NAME(test_nvram_list_remove), &test_nvram_list_remove},
+		{FUNC_NAME(test_nvram_list_remove_second), &test_nvram_list_remove_second},
+		{FUNC_NAME(test_nvram_list_remove_middle), &test_nvram_list_remove_middle},
 		{NULL, NULL},
 };
 
