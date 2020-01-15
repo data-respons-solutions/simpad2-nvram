@@ -10,6 +10,9 @@
 #include "nvram.h"
 #include "libnvram/libnvram.h"
 
+#define xstr(a) str(a)
+#define str(a) #a
+
 #define NVRAM_LOCKFILE "/run/lock/nvram.lock"
 #define NVRAM_ENV_DEBUG "NVRAM_DEBUG"
 #define NVRAM_ENV_FACTORY_MODE "NVRAM_FACTORY_MODE"
@@ -17,10 +20,6 @@
 #define NVRAM_ENV_USER_B "NVRAM_USER_B"
 #define NVRAM_ENV_FACTORY_A "NVRAM_FACTORY_A"
 #define NVRAM_ENV_FACTORY_B "NVRAM_FACTORY_B"
-#define NVRAM_DEFAULT_USER_A "/srv/nvram/user_a"
-#define NVRAM_DEFAULT_USER_B "/srv/nvram/user_b"
-#define NVRAM_DEFAULT_FACTORY_A "/srv/nvram/factory_a"
-#define NVRAM_DEFAULT_FACTORY_B "/srv/nvram/factory_b"
 
 static int FDLOCK = 0;
 
@@ -160,12 +159,12 @@ int main(int argc, char** argv)
 		goto exit;
 	}
 
-	r = nvram_init(&nvram_factory, &list_factory, NVRAM_DEFAULT_FACTORY_A, NVRAM_DEFAULT_FACTORY_B);
+	r = nvram_init(&nvram_factory, &list_factory, xstr(NVRAM_FACTORY_A), xstr(NVRAM_FACTORY_B));
 	if (r) {
 		goto exit;
 	}
 	if (!opts.factory_mode) {
-		r = nvram_init(&nvram_user, &list_user, NVRAM_DEFAULT_USER_A, NVRAM_DEFAULT_USER_B);
+		r = nvram_init(&nvram_user, &list_user, xstr(NVRAM_USER_A), xstr(NVRAM_USER_B));
 		if (r) {
 			goto exit;
 		}
