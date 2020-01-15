@@ -54,6 +54,6 @@ install:
 	install -m 0755 -D nvram $(INSTALL_PATH)/
 
 clean:
-	rm -f $(OBJS)
+	rm -f *.o
 	rm -f nvram
 	make -C libnvram clean
