@@ -1,58 +1,59 @@
 
+CC ?= gcc
 INSTALL_PATH ?= /usr/sbin
 
-VPD_EEPROM_PATH ?= "/dev/mtd1"
-VPD_MTD_LABEL_A ?= "user_a"
-VPT_MTD_LABEL_B ?= "user_b"
-VPD_MTD_WP ?= "gpio101"
+NVRAM_INTERFACE_TYPE ?= file
+OBJS = log.o nvram.o nvram_interface.o main.o libnvram/libnvram.a
 
-CXX ?= g++
-CXXFLAGS += -std=c++11 
-CXXFLAGS_FILE = -DTARGET_FILE
-CXXFLAGS_EFI = -DTARGET_EFI
-CXXFLAGS_LEGACY = -DTARGET_LEGACY -DVPD_EEPROM_PATH=$(VPD_EEPROM_PATH)
-CXXFLAGS_MTD = -DTARGET_MTD -DVPD_MTD_LABEL_A=$(VPD_MTD_LABEL_A) -DVPD_MTD_LABEL_B=$(VPT_MTD_LABEL_B) -DVPD_MTD_WP=$(VPD_MTD_WP)
+ifeq ($(NVRAM_INTERFACE_TYPE), file)
+OBJS += nvram_interface_file.o
+NVRAM_FACTORY_A ?= /srv/nvram/factory_a
+NVRAM_FACTORY_B ?= /srv/nvram/factory_b
+NVRAM_USER_A ?= /srv/nvram/user_a
+NVRAM_USER_B ?= /srv/nvram/user_b
+endif
 
-COMMON_OBJS := vpd.o
-$(COMMON_OBJS): vpd.h vpdstorage.h crc32.h eeprom_vpd.h eeprom_vpd_nofs.h efivpd.h filevpd.h Makefile
+ifeq ($(NVRAM_INTERFACE_TYPE), mtd)
+OBJS += nvram_interface_mtd.o
+LDFLAGS += -lmtd
+NVRAM_FACTORY_A ?= factory_a
+NVRAM_FACTORY_B ?= factory_b
+NVRAM_USER_A ?= user_a
+NVRAM_USER_B ?= user_b
+endif
 
-all: nvram_file nvram_efi nvram_legacy nvram_mtd
+ifeq ($(NVRAM_INTERFACE_TYPE), efi)
+OBJS += nvram_interface_efi.o
+LDFLAGS += -le2p
+NVRAM_FACTORY_A ?= a
+NVRAM_FACTORY_B ?= b
+NVRAM_USER_A ?= c
+NVRAM_USER_B ?= d
+endif
+
+CFLAGS += -std=gnu11 -Wall -Wextra -Werror -pedantic
+CFLAGS += -DNVRAM_FACTORY_A=$(NVRAM_FACTORY_A)
+CFLAGS += -DNVRAM_FACTORY_B=$(NVRAM_FACTORY_B)
+CFLAGS += -DNVRAM_USER_A=$(NVRAM_USER_A)
+CFLAGS += -DNVRAM_USER_B=$(NVRAM_USER_B)
+
+all: nvram
 .PHONY : all
 
-nvram_file.o : nvram.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_FILE) -c -o $@ $<
-	
-nvram_efi.o : nvram.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_EFI) -c -o $@ $<
+nvram : $(OBJS)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
-nvram_legacy.o : nvram.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_LEGACY) -c -o $@ $<
-	
-nvram_mtd.o : nvram.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_MTD) -c -o $@ $<
-
-nvram_file : $(COMMON_OBJS) nvram_file.o filevpd.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-	
-nvram_efi : $(COMMON_OBJS) nvram_efi.o efivpd.o
-	$(CXX) -o $@ $^ $(LDFLAGS) -le2p
-	
-nvram_legacy : $(COMMON_OBJS) nvram_legacy.o eeprom_vpd.o crc32.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-	
-nvram_mtd : $(COMMON_OBJS) nvram_mtd.o mtdvpd.o libnvram/libnvram.a
-	$(CXX) -o $@ $^ $(LDFLAGS) -lmtd
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: libnvram/libnvram.a
 libnvram/libnvram.a:
 	make -C libnvram
 
 install:
-	install -m 0755 -D nvram_file $(INSTALL_PATH)/nvram_file
-	install -m 0755 -D nvram_efi $(INSTALL_PATH)/nvram_efi
-	install -m 0755 -D nvram_legacy $(INSTALL_PATH)/nvram_legacy
-	install -m 0755 -D nvram_mtd $(INSTALL_PATH)/nvram_mtd
+	install -m 0755 -D nvram $(INSTALL_PATH)/
 
 clean:
-	rm -f *.o nvram_file nvram_efi nvram_legacy nvram_mtd
+	rm -f $(OBJS)
+	rm -f nvram
 	make -C libnvram clean
