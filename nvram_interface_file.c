@@ -53,8 +53,13 @@ int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section s
 		return -EINVAL;
 	}
 
+	const char* path = nvram_interface_path(priv, section);
+	if (!path) {
+		return -EINVAL;
+	}
+
 	int r = 0;
-	int fd = open(nvram_interface_path(priv, section), O_RDONLY);
+	int fd = open(path, O_RDONLY);
 	if (fd < 0) {
 		return -errno;
 	}
@@ -81,8 +86,13 @@ int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section 
 		return -EINVAL;
 	}
 
+	const char* path = nvram_interface_path(priv, section);
+	if (!path) {
+		return -EINVAL;
+	}
+
 	int r = 0;
-	int fd = open(nvram_interface_path(priv, section), O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR);
+	int fd = open(path, O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR);
 	if (fd < 0) {
 		return -errno;
 	}
@@ -111,6 +121,6 @@ const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum n
 	case NVRAM_SECTION_B:
 		return priv->b_path;
 	default:
-		return "UNDEFINED_PATH";
+		return NULL;
 	}
 }
