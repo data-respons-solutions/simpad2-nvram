@@ -25,10 +25,10 @@ endif
 ifeq ($(NVRAM_INTERFACE_TYPE), efi)
 OBJS += nvram_interface_efi.o
 LDFLAGS += -le2p
-NVRAM_FACTORY_A ?= a
-NVRAM_FACTORY_B ?= b
-NVRAM_USER_A ?= c
-NVRAM_USER_B ?= d
+NVRAM_FACTORY_A ?= /sys/firmware/efi/efivars/604dafe4-587a-47f6-8604-3d33eb83da3d-factory
+NVRAM_FACTORY_B = -
+NVRAM_USER_A ?= /sys/firmware/efi/efivars/604dafe4-587a-47f6-8604-3d33eb83da3d-user
+NVRAM_USER_B = -
 endif
 
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror -pedantic
