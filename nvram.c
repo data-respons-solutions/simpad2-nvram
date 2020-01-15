@@ -9,6 +9,12 @@
 #include "nvram_interface.h"
 #include "libnvram/libnvram.h"
 
+struct nvram {
+	enum nvram_section section;
+	uint32_t counter;
+	struct nvram_interface_priv *priv;
+};
+
 struct nvram_section_data {
 	uint8_t* buf;
 	size_t buf_size;
@@ -83,46 +89,51 @@ static enum nvram_section find_active_section(const struct nvram_section_data* s
 	}
 }
 
-int nvram_init(struct nvram* nvram, struct nvram_list* list, const char* section_a, const char* section_b)
+int nvram_init(struct nvram** nvram, struct nvram_list* list, const char* section_a, const char* section_b)
 {
 	int r = 0;
 	struct nvram_section_data data_a = {NULL,0,0,0,0};
 	struct nvram_section_data data_b = {NULL,0,0,0,0};
+	struct nvram *pnvram = (struct nvram*) malloc(sizeof(struct nvram));
+	if (!pnvram) {
+		return -ENOMEM;
+	}
+	memset(pnvram, 0, sizeof(struct nvram));
 
-	r = nvram_interface_init(&nvram->priv, section_a, section_b);
+	r = nvram_interface_init(&pnvram->priv, section_a, section_b);
 	if (r) {
 		goto exit;
 	}
 
-	r = read_section(nvram, NVRAM_SECTION_A, &data_a);
+	r = read_section(pnvram, NVRAM_SECTION_A, &data_a);
 	if (r) {
 		goto exit;
 	}
 
-	r = read_section(nvram, NVRAM_SECTION_B, &data_b);
+	r = read_section(pnvram, NVRAM_SECTION_B, &data_b);
 	if (r) {
 		goto exit;
 	}
 
-	nvram->section = find_active_section(&data_a, &data_b);
-	switch (nvram->section) {
+	pnvram->section = find_active_section(&data_a, &data_b);
+	switch (pnvram->section) {
 	case NVRAM_SECTION_A:
-		pr_dbg("section %s: %s: active\n", nvram_section_str(nvram->section), nvram_interface_path(nvram->priv, nvram->section));
+		pr_dbg("section %s: %s: active\n", nvram_section_str(pnvram->section), nvram_interface_path(pnvram->priv, pnvram->section));
 		r = nvram_section_deserialize(list, data_a.buf, data_a.data_len);
 		if (r) {
 			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
 			goto exit;
 		}
-		nvram->counter = data_a.counter;
+		pnvram->counter = data_a.counter;
 		break;
 	case NVRAM_SECTION_B:
-		pr_dbg("section %s: %s: active\n", nvram_section_str(nvram->section), nvram_interface_path(nvram->priv, nvram->section));
+		pr_dbg("section %s: %s: active\n", nvram_section_str(pnvram->section), nvram_interface_path(pnvram->priv, pnvram->section));
 		r = nvram_section_deserialize(list, data_b.buf, data_b.data_len);
 		if (r) {
 			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
 			goto exit;
 		}
-		nvram->counter = data_b.counter;
+		pnvram->counter = data_b.counter;
 		break;
 	case NVRAM_SECTION_UNKNOWN:
 		pr_dbg("no active section found\n");
@@ -131,7 +142,12 @@ int nvram_init(struct nvram* nvram, struct nvram_list* list, const char* section
 
 	r = 0;
 
+	*nvram = pnvram;
+
 exit:
+	if (r) {
+		free(pnvram);
+	}
 	if (data_a.buf) {
 		free(data_a.buf);
 	}
@@ -199,11 +215,16 @@ exit:
 	return r;
 }
 
-int nvram_close(struct nvram* nvram)
+int nvram_close(struct nvram** nvram)
 {
-	if (nvram->priv) {
-		free(nvram->priv);
-		nvram->priv = NULL;
+	struct nvram *pnvram = *nvram;
+	if (pnvram->priv) {
+		free(pnvram->priv);
+	}
+
+	if (*nvram) {
+		free(*nvram);
+		*nvram = NULL;
 	}
 
 	return 0;

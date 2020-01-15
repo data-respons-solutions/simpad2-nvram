@@ -149,9 +149,9 @@ int main(int argc, char** argv)
 		}
 	}
 
-	struct nvram nvram_factory = NVRAM_INITIALIZER;
+	struct nvram *nvram_factory = NULL;
 	struct nvram_list list_factory = NVRAM_LIST_INITIALIZER;
-	struct nvram nvram_user = NVRAM_INITIALIZER;
+	struct nvram *nvram_user = NULL;
 	struct nvram_list list_user = NVRAM_LIST_INITIALIZER;
 
 	r = acquire_lockfile(NVRAM_LOCKFILE, &FDLOCK);
@@ -214,7 +214,7 @@ int main(int argc, char** argv)
 					goto exit;
 				}
 
-				r = nvram_commit(opts.factory_mode ? &nvram_factory : &nvram_user, opts.factory_mode ? &list_factory : &list_user);
+				r = nvram_commit(opts.factory_mode ? nvram_factory : nvram_user, opts.factory_mode ? &list_factory : &list_user);
 				if (r) {
 					goto exit;
 				}
@@ -224,7 +224,7 @@ int main(int argc, char** argv)
 	case OP_DEL:
 		pr_dbg("deleting: %s\n", opts.key);
 		if(nvram_list_remove(opts.factory_mode ? &list_factory : &list_user, opts.key)) {
-			r = nvram_commit(opts.factory_mode ? &nvram_factory : &nvram_user, opts.factory_mode ? &list_factory : &list_user);
+			r = nvram_commit(opts.factory_mode ? nvram_factory : nvram_user, opts.factory_mode ? &list_factory : &list_user);
 			if (r) {
 				goto exit;
 			}
