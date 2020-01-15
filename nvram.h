@@ -41,6 +41,6 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list);
  * @params
  *   nvram: private data
  */
-int nvram_close(struct nvram** nvram);
+void nvram_close(struct nvram** nvram);
 
 #endif // _NVRAM_H_

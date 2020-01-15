@@ -215,7 +215,7 @@ exit:
 	return r;
 }
 
-int nvram_close(struct nvram** nvram)
+void nvram_close(struct nvram** nvram)
 {
 	struct nvram *pnvram = *nvram;
 	if (pnvram->priv) {
@@ -226,6 +226,4 @@ int nvram_close(struct nvram** nvram)
 		free(*nvram);
 		*nvram = NULL;
 	}
-
-	return 0;
 }
