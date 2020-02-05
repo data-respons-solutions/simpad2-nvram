@@ -47,6 +47,9 @@
 //Minimum possible size of an entry where both key and value are 1 char each
 #define NVRAM_ENTRY_MIN_SIZE NVRAM_ENTRY_HEADER_SIZE + 2
 
+#define NVRAM_CRC32_INIT	0xffffffff
+#define NVRAM_CRC32_XOR		0xffffffff
+
 /*
  * Little endian to host
  *
@@ -208,9 +211,12 @@ static void fill_nvram_header(uint8_t* data, uint32_t counter, uint32_t data_siz
 {
 	const uint32_t le_counter = u32tole(counter);
 	const uint32_t le_data_size = u32tole(data_size);
-	const uint32_t le_crc32 = u32tole(calc_crc32(0, data + NVRAM_HEADER_SIZE, data_size));
+	uint32_t le_crc32 = 0;
+
 	memcpy(data + NVRAM_HEADER_COUNTER_OFFSET, &le_counter, sizeof(le_counter));
 	memcpy(data + NVRAM_HEADER_SIZE_OFFSET, &le_data_size, sizeof(le_data_size));
+	memcpy(data + NVRAM_HEADER_CRC32_OFFSET, &le_crc32, sizeof(le_crc32));
+	le_crc32 = u32tole(calc_crc32(NVRAM_CRC32_INIT, data, data_size + NVRAM_HEADER_SIZE) ^ NVRAM_CRC32_XOR);
 	memcpy(data + NVRAM_HEADER_CRC32_OFFSET, &le_crc32, sizeof(le_crc32));
 }
 
@@ -335,7 +341,12 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 		return 0;
 	}
 
-	uint32_t crc32 = calc_crc32(0, data + NVRAM_HEADER_SIZE, _data_len);
+	const uint32_t zero = 0;
+	uint32_t crc32 = calc_crc32(NVRAM_CRC32_INIT, data, NVRAM_HEADER_CRC32_OFFSET);
+	crc32 = calc_crc32(crc32,(uint8_t*) &zero, sizeof(zero));
+	crc32 = calc_crc32(crc32, data + NVRAM_HEADER_SIZE, _data_len);
+	crc32 ^= NVRAM_CRC32_XOR;
+
 	if (crc32 != _data_crc32) {
 		libdebug("crc32 mismatch: 0x%" PRIx32" != 0x%" PRIx32 "\n", crc32, _data_crc32);
 		return 0;

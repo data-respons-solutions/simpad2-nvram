@@ -17,7 +17,7 @@ extern "C" {
  *
  * uint32_t counter = Counter iterated for each write
  * uint32_t len = Length of serialized data
- * uint32_t crc32 = crc32 for serialized data
+ * uint32_t crc32 = crc32 for serialized data. This field zeroed during calculation
  * uint8_t[] data = serialized data
  *
  *
