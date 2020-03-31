@@ -104,7 +104,7 @@ static int init_nvram_mtd(struct nvram_mtd* nvram_mtd, const char* label)
 	int bufsize = r + 1;
 
 	nvram_mtd->path = (char*) malloc(bufsize);
-	if (nvram_mtd->path) {
+	if (!nvram_mtd->path) {
 		return -ENOMEM;
 	}
 	r = snprintf(nvram_mtd->path, bufsize, pathfmt, mtd_num);
