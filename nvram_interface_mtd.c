@@ -143,7 +143,7 @@ int nvram_interface_init(struct nvram_interface_priv** priv, const char* section
 	pbuf->gpio = getenv(NVRAM_ENV_WP_GPIO);
 #ifdef NVRAM_WP_GPIO
 	if (!pbuf->gpio) {
-		pbug->gpio = DEFAULT_NVRAM_WP_GPIO;
+		pbuf->gpio = DEFAULT_NVRAM_WP_GPIO;
 	}
 #endif
 
