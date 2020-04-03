@@ -5,6 +5,7 @@ INSTALL_PATH ?= /usr/sbin
 NVRAM_INTERFACE_TYPE ?= file
 OBJS = log.o nvram.o nvram_interface.o main.o libnvram/libnvram.a
 
+NVRAM_SRC_VERSION := $(shell git describe --dirty --always)
 ifeq ($(NVRAM_INTERFACE_TYPE), file)
 OBJS += nvram_interface_file.o
 NVRAM_SYSTEM_A ?= /srv/nvram/system_a
@@ -36,6 +37,7 @@ CFLAGS += -DNVRAM_SYSTEM_A=$(NVRAM_SYSTEM_A)
 CFLAGS += -DNVRAM_SYSTEM_B=$(NVRAM_SYSTEM_B)
 CFLAGS += -DNVRAM_USER_A=$(NVRAM_USER_A)
 CFLAGS += -DNVRAM_USER_B=$(NVRAM_USER_B)
+CFLAGS += -DSRC_VERSION=$(NVRAM_SRC_VERSION)
 
 all: nvram
 .PHONY : all

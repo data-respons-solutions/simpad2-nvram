@@ -13,6 +13,7 @@
 #define xstr(a) str(a)
 #define str(a) #a
 
+#define NVRAM_PROGRAM_NAME "nvram"
 #define NVRAM_LOCKFILE "/run/lock/nvram.lock"
 #define NVRAM_ENV_DEBUG "NVRAM_DEBUG"
 #define NVRAM_ENV_USER_A "NVRAM_USER_A"
@@ -117,9 +118,30 @@ struct opts {
 	char* val;
 };
 
-static void print_usage(void)
+static void print_usage(const char* progname)
 {
-	printf("RTFM\n");
+	printf("%s, nvram interface, Data Respons Solutions AB\n", progname);
+	printf("Version: %s\n", xstr(SRC_VERSION));
+	printf("Usage:   %s [OPTION] [COMMAND] [KEY] [VALUE]\n", progname);
+	printf("Example: %s set keyname value\n", progname);
+	printf("Defaults to COMMAND list if none set\n");
+	printf("\n");
+
+	printf("Options:\n");
+	printf("  --sys       ignore user section\n");
+	printf("\n");
+
+	printf("Commands:\n");
+	printf("  set         Write attribute. Requires KEY And VALUE\n");
+	printf("  get         Read attribute. Requires KEY\n");
+	printf("  delete      Delete attributes. Requires KEY\n");
+	printf("  list        Lists attributes\n");
+	printf("\n");
+
+	printf("Return values:\n");
+	printf("  0 if ok\n");
+	printf("  errno for error\n");
+	printf("\n");
 }
 
 int main(int argc, char** argv)
@@ -132,10 +154,15 @@ int main(int argc, char** argv)
 		enable_debug();
 	}
 
+	if (argc > 4) {
+		fprintf(stderr, "Too many arguments\n");
+		return EINVAL;
+	}
+
 	for (int i = 0; i < argc; i++) {
 		if (!strcmp("set", argv[i])) {
 			if (i + 2 >= argc) {
-				print_usage();
+				fprintf(stderr, "Too few arguments for command set\n");
 				return EINVAL;
 			}
 			opts.op = OP_SET;
@@ -147,7 +174,7 @@ int main(int argc, char** argv)
 		else
 		if (!strcmp("get", argv[i])) {
 			if (++i >= argc) {
-				print_usage();
+				fprintf(stderr, "Too few arguments for command get\n");
 				return EINVAL;
 			}
 			opts.op = OP_GET;
@@ -161,7 +188,7 @@ int main(int argc, char** argv)
 		else
 		if(!strcmp("delete", argv[i])) {
 			if (++i >= argc) {
-				print_usage();
+				fprintf(stderr, "Too few arguments for command delete\n");
 				return EINVAL;
 			}
 			opts.op = OP_DEL;
@@ -171,6 +198,11 @@ int main(int argc, char** argv)
 		else
 		if (!strcmp("--sys", argv[i])) {
 			opts.system_mode = 1;
+		}
+		else
+		if (!strcmp("--help", argv[i])) {
+			print_usage(NVRAM_PROGRAM_NAME);
+			return 0;
 		}
 	}
 
