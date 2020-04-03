@@ -81,6 +81,12 @@ class test_user_set_get(test_user_base):
         self.nvram_set(key, val2)
         self.assertEqual(val2, self.nvram_get(key))
         
+    def test_with_prefix(self):
+        key = 'SYS_key1'
+        val = 'val1'
+        with self.assertRaises(CalledProcessError):
+            self.nvram_set(key, val)
+
 class test_user_list(test_user_base):
     def test_list(self):
         attributes = {}
@@ -161,6 +167,19 @@ class test_system_set_get(test_system_base):
         self.nvram_set(key, val2)
         self.assertEqual(val2, self.nvram_get(key))
         
+    def test_without_prefix(self):
+        key = 'key1'
+        val = 'val1'
+        with self.assertRaises(CalledProcessError):
+            self.nvram_set(key, val)
+            
+    def test_without_unlock(self):
+        key = 'SYS_key1'
+        val = 'val1'
+        self.env.pop('NVRAM_SYSTEM_UNLOCK')
+        with self.assertRaises(CalledProcessError):
+            self.nvram_set(key, val)
+        
 class test_system_list(test_system_base):
     def test_list(self):
         attributes = {}
@@ -188,6 +207,12 @@ class test_system_delete(test_system_base):
     def test_empty(self):
         key = 'SYS_key1'
         self.nvram_delete(key)
+        
+    def test_without_unlock(self):
+        key = 'SYS_key1'
+        self.env.pop('NVRAM_SYSTEM_UNLOCK')
+        with self.assertRaises(CalledProcessError):
+            self.nvram_delete(key)
 
 if __name__ == '__main__':
     unittest.main()
