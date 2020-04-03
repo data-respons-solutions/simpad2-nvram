@@ -277,14 +277,12 @@ class test_mixed_delete(test_mixed_base):
         val1 = 'val1'
         self.sys=False
         self.nvram_set(key1, val1)
-        print('LIST', self.nvram_list())
         self.sys=True
         self.nvram_set(sys_key1, sys_val1)
-        print('LIST', self.nvram_list())
         self.nvram_delete(sys_key1)
         
+        self.sys=False
         d = self.nvram_list()
-        print('LIST', d)
         self.assertEqual(d, {key1: val1})
         
 if __name__ == '__main__':
