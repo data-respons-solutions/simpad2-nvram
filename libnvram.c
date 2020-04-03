@@ -305,7 +305,7 @@ int nvram_list_remove(struct nvram_list* list, const char* key)
 			if (!prev) {
 				// remove first node
 				destroy_nvram_node(list->entry);
-				list->entry = NULL;
+				list->entry = next;
 			}
 			else{
 				destroy_nvram_node(cur);
