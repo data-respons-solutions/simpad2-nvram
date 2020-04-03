@@ -23,6 +23,16 @@
 
 static int FDLOCK = 0;
 
+static const char* get_env_str(const char* env, const char* def)
+{
+	const char *str = getenv(env);
+	if (str) {
+		return str;
+	}
+
+	return def;
+}
+
 static long get_env_long(const char* env)
 {
 	const char *val = getenv(env);
@@ -153,18 +163,22 @@ int main(int argc, char** argv)
 	struct nvram_list list_factory = NVRAM_LIST_INITIALIZER;
 	struct nvram *nvram_user = NULL;
 	struct nvram_list list_user = NVRAM_LIST_INITIALIZER;
+	const char *nvram_factory_a = get_env_str(NVRAM_ENV_FACTORY_A, xstr(NVRAM_FACTORY_A));
+	const char *nvram_factory_b = get_env_str(NVRAM_ENV_FACTORY_B, xstr(NVRAM_FACTORY_B));
+	const char *nvram_user_a = get_env_str(NVRAM_ENV_USER_A, xstr(NVRAM_USER_A));
+	const char *nvram_user_b = get_env_str(NVRAM_ENV_USER_B, xstr(NVRAM_USER_B));
 
 	r = acquire_lockfile(NVRAM_LOCKFILE, &FDLOCK);
 	if (r) {
 		goto exit;
 	}
 
-	r = nvram_init(&nvram_factory, &list_factory, xstr(NVRAM_FACTORY_A), xstr(NVRAM_FACTORY_B));
+	r = nvram_init(&nvram_factory, &list_factory, nvram_factory_a, nvram_factory_b);
 	if (r) {
 		goto exit;
 	}
 	if (!opts.factory_mode) {
-		r = nvram_init(&nvram_user, &list_user, xstr(NVRAM_USER_A), xstr(NVRAM_USER_B));
+		r = nvram_init(&nvram_user, &list_user, nvram_user_a, nvram_user_b);
 		if (r) {
 			goto exit;
 		}
