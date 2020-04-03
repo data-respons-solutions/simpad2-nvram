@@ -23,8 +23,8 @@ class test_set(unittest.TestCase):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.dir = self.tmpdir.name
         self.env = {
-                'NVRAM_FACTORY_A': f'{self.dir}/factory_a',
-                'NVRAM_FACTORY_B': f'{self.dir}/factory_b',
+                'NVRAM_SYSTEM_A': f'{self.dir}/system_a',
+                'NVRAM_SYSTEM_B': f'{self.dir}/system_b',
                 'NVRAM_USER_A': f'{self.dir}/user_a',
                 'NVRAM_USER_B': f'{self.dir}/user_b',
             }
