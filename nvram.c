@@ -217,13 +217,15 @@ exit:
 
 void nvram_close(struct nvram** nvram)
 {
-	struct nvram *pnvram = *nvram;
-	if (pnvram->priv) {
-		free(pnvram->priv);
-	}
+	if (nvram && *nvram) {
+		struct nvram *pnvram = *nvram;
+		if (pnvram->priv) {
+			free(pnvram->priv);
+		}
 
-	if (*nvram) {
-		free(*nvram);
-		*nvram = NULL;
+		if (*nvram) {
+			free(*nvram);
+			*nvram = NULL;
+		}
 	}
 }
