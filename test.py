@@ -110,7 +110,7 @@ class test_user_delete(test_user_base):
         self.nvram_delete(key)
         with self.assertRaises(CalledProcessError):
             self.nvram_get(key)
-            
+    
     def test_empty(self):
         key = 'key1'
         self.nvram_delete(key)
@@ -130,10 +130,6 @@ class test_system_base(test_user_base):
         self.assertFalse(os.path.isfile(self.env['NVRAM_USER_A']))
         self.assertFalse(os.path.isfile(self.env['NVRAM_USER_B']))
         self.tmpdir.cleanup()
-
-## FIXME: Testa kan itne skriva UTAN _SYS
-## FIXME: User kan inte skriva MED _SYS
-## FIXME: test lock
 
 class test_system_set_get(test_system_base):
     def test_set_get(self):
@@ -213,6 +209,83 @@ class test_system_delete(test_system_base):
         self.env.pop('NVRAM_SYSTEM_UNLOCK')
         with self.assertRaises(CalledProcessError):
             self.nvram_delete(key)
+            
+'''
 
+            Mixed mode
+
+'''
+class test_mixed_base(test_user_base):
+    def setUp(self):
+        super().setUp()
+        self.env['NVRAM_SYSTEM_UNLOCK'] = '16440'
+    
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+class test_mixed_list(test_mixed_base):
+    def tearDown(self):
+        self.assertTrue(os.path.isfile(self.env['NVRAM_SYSTEM_A']))
+        self.assertTrue(os.path.isfile(self.env['NVRAM_SYSTEM_B']))
+        self.assertTrue(os.path.isfile(self.env['NVRAM_USER_A']))
+        self.assertTrue(os.path.isfile(self.env['NVRAM_USER_B']))
+        super().tearDown()
+        
+    def test_list(self):
+        self.sys = True
+        attributes = {}
+        for i in range(10):
+            key = f'SYS_key{i}'
+            val = f'val{i}'
+            attributes[key] = val
+            self.nvram_set(key, val)
+            
+        self.sys = False
+        for i in range(10):
+            key = f'key{i}'
+            val = f'val{i}'
+            attributes[key] = val
+            self.nvram_set(key, val)
+            
+        d = self.nvram_list()
+        self.assertEqual(d, attributes)
+
+class test_mixed_delete(test_mixed_base):
+    def tearDown(self):
+        self.assertTrue(os.path.isfile(self.env['NVRAM_SYSTEM_A']))
+        self.assertTrue(os.path.isfile(self.env['NVRAM_USER_A']))
+        super().tearDown()
+        
+    def test_delete_user(self):
+        sys_key1 = 'SYS_key1'
+        sys_val1 = 'SYS_val1'
+        key1 = 'key1'
+        val1 = 'val1'
+        self.sys=True
+        self.nvram_set(sys_key1, sys_val1)
+        self.sys=False
+        self.nvram_set(key1, val1)
+        self.nvram_delete(key1)
+        
+        d = self.nvram_list()
+        self.assertEqual(d, {sys_key1: sys_val1})
+
+    def test_system_delete(self):
+        sys_key1 = 'SYS_key1'
+        sys_val1 = 'SYS_val1'
+        key1 = 'key1'
+        val1 = 'val1'
+        self.sys=False
+        self.nvram_set(key1, val1)
+        print('LIST', self.nvram_list())
+        self.sys=True
+        self.nvram_set(sys_key1, sys_val1)
+        print('LIST', self.nvram_list())
+        self.nvram_delete(sys_key1)
+        
+        d = self.nvram_list()
+        print('LIST', d)
+        self.assertEqual(d, {key1: val1})
+        
 if __name__ == '__main__':
     unittest.main()
