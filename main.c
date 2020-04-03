@@ -154,7 +154,7 @@ int main(int argc, char** argv)
 		enable_debug();
 	}
 
-	if (argc > 4) {
+	if (argc > 5) {
 		fprintf(stderr, "Too many arguments\n");
 		return EINVAL;
 	}
