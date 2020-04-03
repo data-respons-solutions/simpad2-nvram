@@ -18,7 +18,11 @@ def nvram_set(env, key, val):
 def nvram_get(env, key):
     return nvram(env, ['get', key]).rstrip()
 
-class test_set(unittest.TestCase):
+def nvram_list(env):
+    stdout = nvram(env, ['list'])
+    return dict(pair.split("=") for pair in stdout.split())
+
+class test_user_base(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.dir = self.tmpdir.name
@@ -30,8 +34,11 @@ class test_set(unittest.TestCase):
             }
     
     def tearDown(self):
+        self.assertFalse(os.path.isfile(self.env['NVRAM_SYSTEM_A']))
+        self.assertFalse(os.path.isfile(self.env['NVRAM_SYSTEM_B']))
         self.tmpdir.cleanup()
-        
+
+class test_user_set_get(test_user_base):
     def test_set_get(self):
         nvram_set(self.env, 'var1', 'val1')
         var1 = nvram_get(self.env, 'var1')
@@ -52,6 +59,21 @@ class test_set(unittest.TestCase):
     def test_get_empty(self):
         with self.assertRaises(CalledProcessError):
             nvram_get(self.env, 'key1')
-
+        
+class test_user_list(test_user_base):
+    def test_list(self):
+        attributes = {}
+        for i in range(10):
+            key = f'key{i}'
+            val = f'val{i}'
+            attributes[key] = val
+            nvram_set(self.env, key, val)
+        d = nvram_list(self.env)
+        self.assertEqual(d, attributes)
+        
+    def test_empty(self):
+        d = nvram_list(self.env)
+        self.assertEqual(0, len(d))
+        
 if __name__ == '__main__':
     unittest.main()
