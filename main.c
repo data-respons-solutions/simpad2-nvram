@@ -46,6 +46,15 @@ static long get_env_long(const char* env)
 	return 0;
 }
 
+static int system_unlocked(void)
+{
+	const char* unlock_str = getenv(NVRAM_ENV_SYSTEM_UNLOCK);
+	if (unlock_str && strcmp(unlock_str, xstr(NVRAM_SYSTEM_UNLOCK_MAGIC))) {
+		return 1;
+	}
+	return 0;
+}
+
 static int starts_with(const char* str, const char* prefix)
 {
 	size_t str_len = strlen(str);
@@ -217,7 +226,7 @@ int main(int argc, char** argv)
 			}
 			//FALLTHROUGH
 		case OP_DEL:
-			if (strcmp(getenv(NVRAM_ENV_SYSTEM_UNLOCK), NVRAM_SYSTEM_UNLOCK_MAGIC)) {
+			if (!system_unlocked()) {
 				pr_err("system write locked\n")
 				return EACCES;
 			}
