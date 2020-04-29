@@ -130,7 +130,17 @@ struct opts {
 static void print_usage(const char* progname)
 {
 	printf("%s, nvram interface, Data Respons Solutions AB\n", progname);
-	printf("Version: %s\n", xstr(SRC_VERSION));
+	printf("Version:   %s\n", xstr(SRC_VERSION));
+	printf("Interface: %s\n", xstr(INTERFACE_TYPE));
+	printf("\n");
+
+	printf("Default paths:\n");
+	printf("system_a: %s\n", xstr(NVRAM_SYSTEM_A));
+	printf("system_b: %s\n", xstr(NVRAM_SYSTEM_B));
+	printf("user_a:   %s\n", xstr(NVRAM_USER_A));
+	printf("user_b:   %s\n", xstr(NVRAM_USER_B));
+	printf("\n");
+
 	printf("Usage:   %s [OPTION] [COMMAND] [KEY] [VALUE]\n", progname);
 	printf("Example: %s set keyname value\n", progname);
 	printf("Defaults to COMMAND list if none set\n");
