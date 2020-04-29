@@ -89,7 +89,7 @@ exit:
 
 static int init_nvram_mtd(struct nvram_mtd* nvram_mtd, const char* label)
 {
-	const char *pathfmt = "/dev/mtd%ll";
+	const char *pathfmt = "/dev/mtd%d";
 	long long mtd_size = 0LL;
 	int mtd_num = 0;
 	int r = 0;
