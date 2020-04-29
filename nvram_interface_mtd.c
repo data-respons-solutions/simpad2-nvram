@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
@@ -10,6 +11,7 @@
 #include <mtd/libmtd.h>
 #include <errno.h>
 #include "nvram_interface.h"
+#include "log.h"
 
 #define xstr(a) str(a)
 #define str(a) #a
@@ -96,6 +98,7 @@ static int init_nvram_mtd(struct nvram_mtd* nvram_mtd, const char* label)
 	if (r) {
 		return r;
 	}
+	pr_dbg("%s: found label \"%s\" with index: %d\n", __func__, label, mtd_num);
 
 	r = snprintf(NULL, 0, pathfmt, mtd_num);
 	if (r < 0) {
