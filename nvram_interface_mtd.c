@@ -74,7 +74,7 @@ static int find_mtd(const char* label,  int* mtd_num, long long* mtd_size)
 
 	r = 0;
 
-	exit:
+exit:
 	if (mtd) {
 		libmtd_close(mtd);
 	}
