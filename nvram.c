@@ -102,6 +102,7 @@ int nvram_init(struct nvram** nvram, struct nvram_list* list, const char* sectio
 
 	r = nvram_interface_init(&pnvram->priv, section_a, section_b);
 	if (r) {
+		pr_err("failed initializing interface [%d]: %s\n", -r, strerror(-r));
 		goto exit;
 	}
 
