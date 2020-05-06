@@ -149,6 +149,9 @@ int nvram_interface_init(struct nvram_interface_priv** priv, const char* section
 		pbuf->gpio = DEFAULT_NVRAM_WP_GPIO;
 	}
 #endif
+	if (pbuf->gpio) {
+		pr_dbg("%s: WP_GPIO: %s\n", __func__, pbuf->gpio);
+	}
 
 	*priv = pbuf;
 
@@ -224,6 +227,7 @@ static int erase_mtd(int fd, long long size)
 
 static int set_gpio(const char* path, bool value)
 {
+	pr_dbg("%s: %s: %d\n", __func__, path, value);
 	int fd = open(path, O_WRONLY);
 	if (fd < 0) {
 		return -errno;
@@ -267,11 +271,13 @@ int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section 
 		}
 	}
 
+	pr_dbg("%s: erasing\n", nvram_section_str(section));
 	r = erase_mtd(fd, mtd_size);
 	if (r) {
 		goto exit;
 	}
 
+	pr_dbg("%s: writing\n", nvram_section_str(section));
 	ssize_t bytes = write(fd, buf, size);
 	if (bytes < 0) {
 		r = -errno;
