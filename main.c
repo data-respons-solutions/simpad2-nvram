@@ -67,28 +67,43 @@ static int starts_with(const char* str, const char* prefix)
 	return 0;
 }
 
-static int acquire_lockfile(const char *path, int* fdlock)
+static int acquire_lockfile(const char *path, int *fdlock)
 {
-	int r = 0;
+    int r = 0;
+    int retries = 10;
 
-	int fd = open(path, O_CREAT | O_WRONLY, S_IWUSR | S_IRUSR);
-	if (fd < 0) {
-		r = errno;
-		pr_err("failed opening lockfile: %s [%d]: %s\n", path, r, strerror(r));
-		return -r;
-	}
+    int fd = open(path, O_CREAT | O_WRONLY, S_IWUSR | S_IRUSR);
+    if (fd < 0) {
+        r = errno;
+        pr_err("failed opening lockfile: %s [%d]: %s\n", path, r, strerror(r));
+        return -r;
+    }
 
-	if (flock(fd, LOCK_EX | LOCK_NB)) {
-		r = errno;
-		pr_err("failed locking lockfile: %s [%d]: %s\n", path, r, strerror(r));
-		close(fd);
-		return -r;
-	}
+    while (retries--) {
+        if (flock(fd, LOCK_EX | LOCK_NB)) {
+            r = errno;
+            if (r != EWOULDBLOCK) {
+                pr_err("failed locking lockfile: %s [%d]: %s\n", path, r,
+                       strerror(r));
+                close(fd);
+                return -r;
+            }
+            else if (retries == 0) {
+                pr_err("failed locking lockfile: %s [%d]: %s\n", path, r,
+                       strerror(ETIMEDOUT));
+                close(fd);
+                return -ETIMEDOUT;
+            }
+            usleep(10000);
+        } else {
+            break;
+        }
+    }
 
-	*fdlock = fd;
-	pr_dbg("%s: locked\n", path);
+    *fdlock = fd;
+    pr_dbg("%s: locked\n", path);
 
-	return 0;
+    return 0;
 }
 
 static int release_lockfile(const char* path, int fdlock)
