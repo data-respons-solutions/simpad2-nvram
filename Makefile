@@ -14,12 +14,15 @@ libnvram.a: crc32.o libnvram.o
 
 libnvram-test: libnvram-test.o libnvram.a
 	$(CC) -o $@ $^ $(LDFLAGS)
+	
+libnvram-list-test: libnvram-list-test.o libnvram.a
+	$(CC) -o $@ $^ $(LDFLAGS)
    
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
-test: libnvram-test
+test: libnvram-test libnvram-list-test
 
 .PHONY: clean
 clean:
@@ -28,4 +31,6 @@ clean:
 	rm -f libnvram.a
 	rm -f libnvram-test.o
 	rm -f libnvram-test
+	rm -f libnvram-list-test.o
+	rm -f libnvram-list-test
 	
