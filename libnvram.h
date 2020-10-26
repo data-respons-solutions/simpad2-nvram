@@ -31,67 +31,51 @@ extern "C" {
  * uint8_t[] value = Value string NOT including null terminator
  */
 
-// Parsed nvram data stored as linked nodes
-struct nvram_node {
-	char* key;
-	char* value;
-	struct nvram_node* next;
+struct nvram_entry {
+	uint8_t *key;
+	uint32_t key_len;
+	uint8_t *value;
+	uint32_t value_len;
 };
 
-#define NVRAM_LIST_INITIALIZER {NULL}
-
 struct nvram_list {
-	struct nvram_node* entry;
+	struct nvram_entry *entry;
+	struct nvram_list *next;
 };
 
 /*
- * Set value for key in list
- *
- * @params
- *   list: list containing entries
- *   key: key of entry
- *   value: value of entry
+ * Set entry. Entry with identical key will be overwritten.
+ * Entry is copied to list.
  *
  * @returns
  *   0 for success
  *   negative errno for error
  */
 
-int nvram_list_set(struct nvram_list* list, const char* key, const char* value);
+int nvram_list_set(struct nvram_list** list, const struct nvram_entry* entry);
 
 /*
  * Get value with key from list
  *
- * @params
- *   list: list containing entries
- *   key: key of entry
- *
  * @returns
- *   Pointer to char string in list
+ *   Pointer to entry in list
  *   NULL if not found
  */
-char* nvram_list_get(const struct nvram_list* list, const char* key);
+struct nvram_entry* nvram_list_get(const struct nvram_list* list, const uint8_t* key, uint32_t key_len);
 
 /*
- * Remove value with key from list
- *
- * @params
- * 	list: list containing entries
- *  key: key of entry
+ * Remove entry.
  *
  * @returns
  * 1 if removed, 0 if not found
  */
 
-int nvram_list_remove(struct nvram_list* list, const char* key);
+int nvram_list_remove(struct nvram_list** list, const uint8_t* key, uint32_t key_len);
 
 /*
  * Destroy nvram list
- *
- * @params
- *   list: list to destroy
  */
-void destroy_nvram_list(struct nvram_list* list);
+void destroy_nvram_list(struct nvram_list** list);
 
 /*
  * Verify buffer contains valid nvram section
@@ -120,7 +104,7 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
  *  0 for success
  *  Negative errno for error
  */
-int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint32_t len);
+int nvram_section_deserialize(struct nvram_list** list, const uint8_t* data, uint32_t len);
 
 /*
  * Returns size needed for serialized buffer

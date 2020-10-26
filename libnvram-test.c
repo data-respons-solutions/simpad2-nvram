@@ -8,30 +8,30 @@
 
 #include "libnvram.h"
 
-static int test_node(const struct nvram_node* node, const char* key, const char* value)
+// return 0 for equal
+static int keycmp(const uint8_t* key1, uint32_t key1_len, const uint8_t* key2, uint32_t key2_len)
 {
-	if (!node) {
-			printf("node not set\n");
-			return 0;
-		}
-	if (!node->key) {
-		printf("node->key not set\n");
-		return 0;
+	if (key1_len == key2_len) {
+		return memcmp(key1, key2, key1_len);
 	}
-	if (strcmp(node->key, key)) {
-		printf("node->key corrupt\n");
-		return 0;
-	}
-	if (!node->value) {
-		printf("node->value not set\n");
-		return 0;
-	}
-	if (strcmp(node->value, value)) {
-		printf("node->value corrupt\n");
-		return 0;
-	}
-
 	return 1;
+}
+
+// return 0 for equal
+static int entrycmp(const struct nvram_entry* entry1, const struct nvram_entry* entry2)
+{
+	if (!keycmp(entry1->key, entry1->key_len, entry2->key, entry2->key_len)) {
+		return keycmp(entry1->value, entry1->value_len, entry2->value, entry2->value_len);
+	}
+	return 1;
+}
+
+static void fill_entry(struct nvram_entry* entry, const char* key, const char* value)
+{
+	entry->key = (uint8_t*) key;
+	entry->key_len = strlen(key);
+	entry->value = (uint8_t*) value;
+	entry->value_len = strlen(value);
 }
 
 static int test_nvram_section()
@@ -98,27 +98,30 @@ static int test_nvram_deserialize()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abcdefghij";
-	const char* test_key2 = "TEST2";
-	const char* test_val2 = "def";
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abcdefghij");
+	struct nvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
 
-	int ret = 0;
-
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
-	ret = nvram_section_deserialize(&list, (uint8_t*) &test_section, sizeof(test_section));
-	if (ret < 0) {
-		printf("nvram_section_deserialize failed: %s\n", strerror(-ret));
+	struct nvram_list *list = NULL;
+	int r = nvram_section_deserialize(&list, (uint8_t*) &test_section, sizeof(test_section));
+	if (r) {
+		printf("nvram_section_deserialize failed: %s\n", strerror(-r));
 		goto error_exit;
 	}
 
-	if(!test_node(list.entry, test_key1, test_val1)) {
-		printf("node1 corrupt\n");
+	if (!list) {
+		printf("list empty\n");
 		goto error_exit;
 	}
 
-	if(!test_node(list.entry->next, test_key2, test_val2)) {
-		printf("node2 corrupt\n");
+	if (entrycmp(list->entry, &entry1)) {
+		printf("entry1 wrong\n");
+		goto error_exit;
+	}
+
+	if (entrycmp(list->next->entry, &entry2)) {
+		printf("entry2 wrong\n");
 		goto error_exit;
 	}
 
@@ -126,7 +129,7 @@ static int test_nvram_deserialize()
 	return 1;
 
 error_exit:
-destroy_nvram_list(&list);
+	destroy_nvram_list(&list);
 	return 0;
 }
 
@@ -140,28 +143,28 @@ static int test_nvram_serialize()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	struct nvram_node test_node2 = {
-		.key = "TEST2",
-		.value = "def",
-		.next = NULL,
-	};
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abcdefghij");
+	struct nvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
 
-	struct nvram_node test_node1 = {
-		.key = "TEST1",
-		.value = "abcdefghij",
-		.next = &test_node2,
-	};
-
-	int ret = 0;
+	struct nvram_list *list = NULL;
 	uint8_t* data = NULL;
-
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
-	list.entry = &test_node1;
-
 	uint32_t size = 0;
-	ret = nvram_section_serialize_size(&list, &size);
-	if (ret < 0) {
-		printf("nvram_section_serialize_size failed: %s\n", strerror(-ret));
+	int r = nvram_list_set(&list, &entry1);
+	if (r) {
+		printf("nvram_list_set failed: %s\n", strerror(-r));
+		goto error_exit;
+	}
+	r = nvram_list_set(&list, &entry2);
+	if (r) {
+		printf("nvram_list_set failed: %s\n", strerror(-r));
+		goto error_exit;
+	}
+
+	r = nvram_section_serialize_size(list, &size);
+	if (r) {
+		printf("nvram_section_serialize_size failed: %s\n", strerror(-r));
 		goto error_exit;
 	}
 
@@ -171,9 +174,9 @@ static int test_nvram_serialize()
 		goto error_exit;
 	}
 
-	ret = nvram_section_serialize(&list, 0x10, data, size);
-	if (ret < 0) {
-		printf("nvram_section_serialize failed: %s\n", strerror(-ret));
+	r = nvram_section_serialize(list, 0x10, data, size);
+	if (r) {
+		printf("nvram_section_serialize failed: %s\n", strerror(-r));
 		goto error_exit;
 	}
 
@@ -190,12 +193,14 @@ static int test_nvram_serialize()
 	if (data) {
 		free(data);
 	}
+	destroy_nvram_list(&list);
 	return 1;
 
 error_exit:
 	if (data) {
 		free(data);
 	}
+	destroy_nvram_list(&list);
 	return 0;
 }
 
@@ -227,6 +232,8 @@ int main(int argc, char** argv)
 		}
 		printf("%s: %s\n", test_array[i].name, r ? "PASS" : "FAIL");
 	}
+
+	printf("Result: %s\n", errors ? "FAIL" : "PASS");
 
 	if(errors) {
 		return 1;

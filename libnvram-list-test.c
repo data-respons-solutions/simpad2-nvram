@@ -8,52 +8,75 @@
 
 #include "libnvram.h"
 
-static int check_nvram_list_entry(const struct nvram_list* list, int index, const char* key, const char* value)
+// return 0 for equal
+static int keycmp(const uint8_t* key1, uint32_t key1_len, const uint8_t* key2, uint32_t key2_len)
 {
-	struct nvram_node* cur = list->entry;
-	for (int i = 0; cur; i++) {
-		if (!strcmp(cur->key, key)) {
-			if (!strcmp(cur->value, value)) {
-				if (index != i) {
-					printf("%s: %s: found at wrong index %d != %d\n", __func__, key, index, i);
+	if (key1_len == key2_len) {
+		return memcmp(key1, key2, key1_len);
+	}
+	return 1;
+}
+
+// return 0 for equal
+static int entrycmp(const struct nvram_entry* entry1, const struct nvram_entry* entry2)
+{
+	if (!keycmp(entry1->key, entry1->key_len, entry2->key, entry2->key_len)) {
+		return keycmp(entry1->value, entry1->value_len, entry2->value, entry2->value_len);
+	}
+	return 1;
+}
+
+// validate entry in list at pos index
+// return 0 for equal
+static int check_nvram_list_entry(const struct nvram_list* list, int index, const struct nvram_entry* entry)
+{
+	int cur_index = 0;
+	for (struct nvram_list* cur = (struct nvram_list*) list; cur != NULL; cur = cur->next) {
+		if (cur->entry) {
+			if (!entrycmp(cur->entry, entry)) {
+				if (index != cur_index) {
+					printf("%s: found at wrong index %d != %d\n", __func__, index, cur_index);
 					return 1;
 				}
 				return 0;
 			}
-			else {
-				printf("%s: %s: value mismatch %s != %s\n", __func__, key, value, cur->value);
-				return 1;
-			}
 		}
-		cur = cur->next;
+		cur_index++;
 	}
 
-	printf("%s: %s not found in list\n", __func__, key);
+	printf("%s: not found in list\n", __func__);
 	return 1;
+}
+
+static void fill_entry(struct nvram_entry* entry, const char* key, const char* value)
+{
+	entry->key = (uint8_t*) key;
+	entry->key_len = strlen(key) + 1;
+	entry->value = (uint8_t*) value;
+	entry->value_len = strlen(value) + 1;
 }
 
 static int test_nvram_list_set()
 {
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abc";
-	const char* test_key2 = "TEST2";
-	const char* test_val2 = "def";
-	const char* test_key3 = "TEST3";
-	const char* test_val3 = "ghi";
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct nvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
+	struct nvram_entry entry3;
+	fill_entry(&entry3, "TEST3", "ghi");
+	struct nvram_list *list = NULL;
 
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
 	int r = 0;
-
-	nvram_list_set(&list, test_key1, test_val1);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_set(&list, &entry1);
+	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key2, test_val2);
-	if (check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+	nvram_list_set(&list, &entry2);
+	if (check_nvram_list_entry(list, 1, &entry2)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key3, test_val3);
-	if (check_nvram_list_entry(&list, 2, test_key3, test_val3)) {
+	nvram_list_set(&list, &entry3);
+	if (check_nvram_list_entry(list, 2, &entry3)) {
 		goto error_exit;
 	}
 
@@ -65,19 +88,20 @@ error_exit:
 
 static int test_nvram_list_overwrite_first()
 {
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abc";
-	const char* test_val2 = "def";
+	struct nvram_entry value1;
+	fill_entry(&value1, "TEST1", "abc");
+	struct nvram_entry value2;
+	fill_entry(&value2, "TEST1", "def");
 
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list = NULL;
 	int r = 0;
 
-	nvram_list_set(&list, test_key1, test_val1);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_set(&list, &value1);
+	if (check_nvram_list_entry(list, 0, &value1)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key1, test_val2);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val2)) {
+	nvram_list_set(&list, &value2);
+	if (check_nvram_list_entry(list, 0, &value2)) {
 		goto error_exit;
 	}
 
@@ -89,25 +113,26 @@ error_exit:
 
 static int test_nvram_list_overwrite_second()
 {
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abc";
-	const char* test_key2 = "TEST2";
-	const char* test_val2 = "def";
-	const char* test_val3 = "ghi";
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct nvram_entry value1;
+	fill_entry(&value1, "TEST2", "def");
+	struct nvram_entry value2;
+	fill_entry(&value2, "TEST2", "ghi");
 
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list = NULL;
 	int r = 0;
 
-	nvram_list_set(&list, test_key1, test_val1);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_set(&list, &entry1);
+	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key2, test_val2);
-	if (check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+	nvram_list_set(&list, &value1);
+	if (check_nvram_list_entry(list, 1, &value1)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key2, test_val3);
-	if (check_nvram_list_entry(&list, 1, test_key2, test_val3)) {
+	nvram_list_set(&list, &value2);
+	if (check_nvram_list_entry(list, 1, &value2)) {
 		goto error_exit;
 	}
 
@@ -119,18 +144,18 @@ error_exit:
 
 static int test_nvram_list_remove()
 {
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abc";
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
 
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list = NULL;
 	int r = 0;
 
-	nvram_list_set(&list, test_key1, test_val1);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_set(&list, &entry1);
+	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
-	nvram_list_remove(&list, test_key1);
-	if (!check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_remove(&list, entry1.key, entry1.key_len);
+	if (!check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
 
@@ -142,24 +167,24 @@ error_exit:
 
 static int test_nvram_list_remove_first()
 {
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abc";
-	const char* test_key2 = "TEST2";
-	const char* test_val2 = "def";
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct nvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
 
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list = NULL;
 	int r = 0;
 
-	nvram_list_set(&list, test_key1, test_val1);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_set(&list, &entry1);
+	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key2, test_val2);
-	if (check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+	nvram_list_set(&list, &entry2);
+	if (check_nvram_list_entry(list, 1, &entry2)) {
 		goto error_exit;
 	}
-	nvram_list_remove(&list, test_key1);
-	if (check_nvram_list_entry(&list, 0, test_key2, test_val2)) {
+	nvram_list_remove(&list, entry1.key, entry1.key_len);
+	if (check_nvram_list_entry(list, 0, &entry2)) {
 		goto error_exit;
 	}
 
@@ -171,24 +196,24 @@ error_exit:
 
 static int test_nvram_list_remove_second()
 {
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abc";
-	const char* test_key2 = "TEST2";
-	const char* test_val2 = "def";
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct nvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
 
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list = NULL;
 	int r = 0;
 
-	nvram_list_set(&list, test_key1, test_val1);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_set(&list, &entry1);
+	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key2, test_val2);
-	if (check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+	nvram_list_set(&list, &entry2);
+	if (check_nvram_list_entry(list, 1, &entry2)) {
 		goto error_exit;
 	}
-	nvram_list_remove(&list, test_key2);
-	if (!check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+	nvram_list_remove(&list, entry2.key, entry2.key_len);
+	if (!check_nvram_list_entry(list, 1, &entry2)) {
 		goto error_exit;
 	}
 
@@ -200,38 +225,37 @@ error_exit:
 
 static int test_nvram_list_remove_middle()
 {
-	const char* test_key1 = "TEST1";
-	const char* test_val1 = "abc";
-	const char* test_key2 = "TEST2";
-	const char* test_val2 = "def";
-	const char* test_key3 = "TEST3";
-	const char* test_val3 = "ghi";
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct nvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
+	struct nvram_entry entry3;
+	fill_entry(&entry3, "TEST3", "ghi");
 
-
-	struct nvram_list list = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list = NULL;
 	int r = 0;
 
-	nvram_list_set(&list, test_key1, test_val1);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_set(&list, &entry1);
+	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key2, test_val2);
-	if (check_nvram_list_entry(&list, 1, test_key2, test_val2)) {
+	nvram_list_set(&list, &entry2);
+	if (check_nvram_list_entry(list, 1, &entry2)) {
 		goto error_exit;
 	}
-	nvram_list_set(&list, test_key3, test_val3);
-	if (check_nvram_list_entry(&list, 2, test_key3, test_val3)) {
+	nvram_list_set(&list, &entry3);
+	if (check_nvram_list_entry(list, 2, &entry3)) {
 		goto error_exit;
 	}
 
-	nvram_list_remove(&list, test_key2);
-	if (check_nvram_list_entry(&list, 0, test_key1, test_val1)) {
+	nvram_list_remove(&list, entry2.key, entry2.key_len);
+	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
 	}
-	if (check_nvram_list_entry(&list, 1, test_key3, test_val3)) {
+	if (check_nvram_list_entry(list, 1, &entry3)) {
 		goto error_exit;
 	}
-	if (!check_nvram_list_entry(&list, 2, test_key2, test_val2)) {
+	if (!check_nvram_list_entry(list, 2, &entry2)) {
 		goto error_exit;
 	}
 
@@ -273,6 +297,8 @@ int main(int argc, char** argv)
 		}
 		printf("%s: %s\n", test_array[i].name, r ? "PASS" : "FAIL");
 	}
+
+	printf("Result: %s\n", errors ? "FAIL" : "PASS");
 
 	if(errors) {
 		return 1;

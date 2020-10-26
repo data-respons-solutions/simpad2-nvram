@@ -88,56 +88,30 @@ static uint32_t u32tole(uint32_t host)
 }
 
 /*
- * Create nvram node from data buffer containing key (of key_len) and value (of value_len).
- *  Expects key at data[0] and value at data[key_len].
- *  Neither key nor value should be null terminated.
- *
- * @params
- *   data: data buffer
- *   key_len: Length of key
- *   value_len: Length of value
- *
+ * Create nvram entry from key and value.
+
  * @returns
- *   nvram_node (Resource should be released with destroy_nvram_node() by caller)
- *
+ *   nvram_entry (Resource should be released with destroy_nvram_entry() by caller)
  *   NULL for failure.
  */
-static struct nvram_node*
-create_nvram_node(const uint8_t* key, uint32_t key_len, const uint8_t* value, uint32_t value_len)
+static struct nvram_entry*
+create_nvram_entry(const uint8_t* key, uint32_t key_len, const uint8_t* value, uint32_t value_len)
 {
-	const uint32_t key_str_len = key_len + 1;
-	const uint32_t value_str_len = value_len + 1;
-	const size_t sz = key_str_len + value_str_len + sizeof(struct nvram_node);
-	struct nvram_node* node = malloc(sz);
-	if (!node) {
-		libdebug("malloc failed\n");
+	const size_t size = key_len + value_len + sizeof(struct nvram_entry);
+	struct nvram_entry *entry = malloc(size);
+	if (!entry) {
+		libdebug("%s: malloc failed: %zu bytes\n", __func__, size);
 		return NULL;
 	}
+	entry->key = (uint8_t*) entry + sizeof(struct nvram_entry);
+	memcpy(entry->key, key, key_len);
+	entry->key_len = key_len;
 
-	node->key = (char*) node + sizeof(struct nvram_node);
-	memcpy(node->key, (char*) key, key_len);
-	memset(node->key + key_len, '\0', 1);
+	entry->value = (uint8_t*) entry + sizeof(struct nvram_entry) + key_len;
+	memcpy(entry->value, value, value_len);
+	entry->value_len = value_len;
 
-	node->value = (char*) node + sizeof(struct nvram_node) + key_str_len;
-	memcpy(node->value, (char*) value, value_len);
-	memset(node->value + value_len, '\0', 1);
-	node->next = NULL;
-
-	libdebug("new: %s = %s\n", node->key, node->value);
-
-	return node;
-}
-
-static struct nvram_node*
-create_nvram_node_str(const char* key, const char* value)
-{
-	return create_nvram_node((uint8_t*) key, strlen(key), (uint8_t*) value, strlen(value));
-}
-
-static struct nvram_node*
-create_nvram_node_raw(const uint8_t* data, uint32_t key_len, uint32_t value_len)
-{
-	return create_nvram_node(data, key_len, data + key_len, value_len);
+	return entry;
 }
 
 /*
@@ -180,28 +154,27 @@ static int is_valid_nvram_entry(const uint8_t* data, uint32_t max_len, uint32_t*
 }
 
 /* Fill nvram entry to buffer and return size used */
-static uint32_t fill_nvram_entry(uint8_t* data, const char* key, const char* value)
+static uint32_t fill_nvram_entry(uint8_t* data, const struct nvram_entry* entry)
 {
-	const uint32_t key_len = strlen(key);
-	const uint32_t le_key_len = u32tole(key_len);
-	const uint32_t value_len = strlen(value);
-	const uint32_t le_value_len = u32tole(value_len);
+	const uint32_t le_key_len = u32tole(entry->key_len);
+	const uint32_t le_value_len = u32tole(entry->value_len);
 	memcpy(data + NVRAM_ENTRY_KEY_LEN_OFFSET, &le_key_len, sizeof(le_key_len));
 	memcpy(data + NVRAM_ENTRY_VALUE_LEN_OFFSET, &le_value_len, sizeof(le_value_len));
-	memcpy(data + NVRAM_ENTRY_DATA_OFFSET, key, key_len);
-	memcpy(data + NVRAM_ENTRY_DATA_OFFSET + key_len, value, value_len);
+	memcpy(data + NVRAM_ENTRY_DATA_OFFSET, entry->key, entry->key_len);
+	memcpy(data + NVRAM_ENTRY_DATA_OFFSET + entry->key_len, entry->value, entry->value_len);
 
-	const uint32_t entry_size = key_len + value_len + NVRAM_ENTRY_HEADER_SIZE;
+	const uint32_t entry_size = entry->key_len + entry->value_len + NVRAM_ENTRY_HEADER_SIZE;
 	return entry_size;
 }
 
 /* Calculate size needed for all entries in linked node */
-static uint32_t calc_serialized_entries_size(const struct nvram_node* node)
+static uint32_t calc_serialized_entries_size(const struct nvram_list* list)
 {
 	uint32_t size = 0;
-	while(node) {
-		size += NVRAM_ENTRY_HEADER_SIZE + strlen(node->key) + strlen(node->value);
-		node = node->next;
+	struct nvram_list *cur = (struct nvram_list*) list;
+	while(cur) {
+		size += NVRAM_ENTRY_HEADER_SIZE + cur->entry->key_len + cur->entry->value_len;
+		cur = cur->next;
 	}
 	return size;
 }
@@ -220,72 +193,88 @@ static void fill_nvram_header(uint8_t* data, uint32_t counter, uint32_t data_siz
 	memcpy(data + NVRAM_HEADER_CRC32_OFFSET, &le_crc32, sizeof(le_crc32));
 }
 
-static void destroy_nvram_node(struct nvram_node* node)
+static void destroy_nvram_entry(struct nvram_entry* entry)
 {
-	if (node) {
-		free(node);
-		node = NULL;
+	if (entry) {
+		free(entry);
+		entry = NULL;
 	}
 }
 
-void destroy_nvram_list(struct nvram_list* list)
+void destroy_nvram_list(struct nvram_list** list)
 {
-	if (list->entry) {
-		struct nvram_node* cur = list->entry;
-		struct nvram_node* next = NULL;
-		while (cur) {
-			next = cur->next;
-			destroy_nvram_node(cur);
-			cur = next;
-		}
-		list->entry = NULL;
+	struct nvram_list *cur = *list;
+	while (cur) {
+		destroy_nvram_entry(cur->entry);
+		struct nvram_list *prev = cur;
+		cur = cur->next;
+		free(prev);
 	}
+	*list = NULL;
 }
 
-int nvram_list_set(struct nvram_list* list, const char* key, const char* value)
+// return 0 for equal
+static int keycmp(const uint8_t* key1, uint32_t key1_len, const uint8_t* key2, uint32_t key2_len)
 {
-	struct nvram_node* next = NULL;
-	struct nvram_node* prev = NULL;
-	struct nvram_node* cur = NULL;
-	for (cur = list->entry; cur; cur = next) {
-		next = cur->next;
-		if (!strcmp(key, cur->key)) {
-			if (!strcmp(value, cur->value)) {
-				return 0;
+	if (key1_len == key2_len) {
+		return memcmp(key1, key2, key1_len);
+	}
+	return 1;
+}
+
+int nvram_list_set(struct nvram_list** list, const struct nvram_entry* entry)
+{
+	struct nvram_list* prev = NULL;
+	struct nvram_list* cur = *list;
+	while (cur) {
+		if (!keycmp(cur->entry->key, cur->entry->key_len, entry->key, entry->key_len)) {
+			if (keycmp(cur->entry->value, cur->entry->value_len, entry->value, entry->value_len)) {
+				// replace entry
+				break;
 			}
-			// replace node
-			break;
+			// already exists
+			return 0;
 		}
 		prev = cur;
+		cur = cur->next;
 	}
 
-	struct nvram_node* new = create_nvram_node_str(key, value);
+	struct nvram_entry *new = create_nvram_entry(entry->key, entry->key_len, entry->value, entry->value_len);
 	if (!new) {
 		return -ENOMEM;
 	}
-	new->next = next;
 
-	if (!prev) {
-		// create or replace first node
-		if (list->entry) {
-			destroy_nvram_node(list->entry);
+	if (!cur) {
+		// new entry
+		cur = malloc(sizeof(struct nvram_list));
+		if (!cur) {
+			destroy_nvram_entry(new);
+			return -ENOMEM;
 		}
-		list->entry = new;
+		cur->entry = new;
+		cur->next = NULL;
+		if (prev) {
+			prev->next = cur;
+		}
+		if (!*list) {
+			*list = cur;
+		}
 	}
 	else {
-		destroy_nvram_node(cur);
-		prev->next = new;
+		// replace entry
+		destroy_nvram_entry(cur->entry);
+		cur->entry = new;
 	}
 
 	return 0;
 }
 
-char* nvram_list_get(const struct nvram_list* list, const char* key)
+struct nvram_entry* nvram_list_get(const struct nvram_list* list, const uint8_t* key, uint32_t key_len)
 {
-	struct nvram_node* cur = list->entry;
+	struct nvram_list* cur = (struct nvram_list*) list;
 	while(cur) {
-		if (!strcmp(key, cur->key)) {
-			return cur->value;
+		if (!keycmp(cur->entry->key, cur->entry->key_len, key, key_len)) {
+			return cur->entry;
 		}
 		cur = cur->next;
 	}
@@ -293,28 +282,24 @@ char* nvram_list_get(const struct nvram_list* list, const char* key)
 	return NULL;
 }
 
-int nvram_list_remove(struct nvram_list* list, const char* key)
+int nvram_list_remove(struct nvram_list** list, const uint8_t* key, uint32_t key_len)
 {
-	struct nvram_node* next = NULL;
-	struct nvram_node* prev = NULL;
-	struct nvram_node* cur = NULL;
-	for (cur = list->entry; cur; cur = next) {
-		next = cur->next;
-		if (!strcmp(key, cur->key)) {
-			// remove node
-			if (!prev) {
-				// remove first node
-				destroy_nvram_node(list->entry);
-				list->entry = next;
+	struct nvram_list* prev = NULL;
+	struct nvram_list* cur = *list;
+	while(cur) {
+		if (!keycmp(cur->entry->key, cur->entry->key_len, key, key_len)) {
+			destroy_nvram_entry(cur->entry);
+			if (prev) {
+				prev->next = cur->next;
 			}
-			else{
-				destroy_nvram_node(cur);
-				prev->next = next;
+			else {
+				*list = cur->next;
 			}
+			free(cur);
 			return 1;
-
 		}
 		prev = cur;
+		cur = cur->next;
 	}
 
 	return 0;
@@ -358,19 +343,17 @@ int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len
 	return 1;
 }
 
-int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint32_t len)
+int nvram_section_deserialize(struct nvram_list** list, const uint8_t* data, uint32_t len)
 {
 	if (!data) {
 		libdebug("data empty\n");
 		return -EINVAL;
 	}
-	if (list->entry) {
+	if (*list) {
 		libdebug("list not empty\n");
 		return -EINVAL;
 	}
 
-	struct nvram_node* new = NULL;
-	struct nvram_node* cur = NULL;
 	for (uint32_t i = NVRAM_HEADER_SIZE; i < len;) {
 		uint32_t remaining = (i > len) ? i - len : len - i;
 		uint32_t key_len = 0;
@@ -379,26 +362,20 @@ int nvram_section_deserialize(struct nvram_list* list, const uint8_t* data, uint
 			return -EINVAL;
 		}
 
-		if(cur) {
-			cur->next = create_nvram_node_raw(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
-			cur = cur->next;
-		}
-		else {
-			cur = create_nvram_node_raw(data + i + NVRAM_ENTRY_HEADER_SIZE, key_len, value_len);
+		struct nvram_entry entry;
+		entry.key = (uint8_t*) data + i + NVRAM_ENTRY_HEADER_SIZE;
+		entry.key_len = key_len;
+		entry.value = (uint8_t*) data + i + NVRAM_ENTRY_HEADER_SIZE + key_len;
+		entry.value_len = value_len;
+
+		int r = nvram_list_set(list, &entry);
+		if (r) {
+			libdebug("Failed creating entry\n");
+			return r;
 		}
 
-		if (!cur) {
-			libdebug("Failed creating node\n");
-			return -ENOMEM;
-		}
-
-		if (!new) {
-			new = cur;
-		}
 		i += NVRAM_ENTRY_HEADER_SIZE + key_len + value_len;
 	}
-
-	list->entry = new;
 
 	return 0;
 }
@@ -410,7 +387,7 @@ int nvram_section_serialize_size(const struct nvram_list* list, uint32_t* size)
 		return -EINVAL;
 	}
 
-	const uint32_t data_len = calc_serialized_entries_size(list->entry);
+	const uint32_t data_len = calc_serialized_entries_size(list);
 	const uint32_t buf_len = NVRAM_HEADER_SIZE + data_len;
 
 	*size = buf_len;
@@ -425,16 +402,16 @@ int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uin
 		return -EINVAL;
 	}
 
-	const uint32_t data_len = calc_serialized_entries_size(list->entry);
+	const uint32_t data_len = calc_serialized_entries_size(list);
 	const uint32_t buf_len = NVRAM_HEADER_SIZE + data_len;
 	if (size < buf_len) {
 		libdebug("data buffer too small\n");
 		return -EINVAL;
 	}
 
-	struct nvram_node* cur = list->entry;
+	struct nvram_list* cur = (struct nvram_list*) list;
 	for (uint32_t i = NVRAM_HEADER_SIZE; cur; cur = cur->next) {
-		i += fill_nvram_entry(data + i, cur->key, cur->value);
+		i += fill_nvram_entry(data + i, cur->entry);
 	}
 
 	fill_nvram_header(data, counter, data_len);
