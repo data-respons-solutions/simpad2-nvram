@@ -7,18 +7,13 @@
  */
 #ifdef __UBOOT__
 #include <common.h>
-#include <stdlib.h>
-#include <inttypes.h>
 #include <linux/types.h>
 #else
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <stdint.h>
-#include <inttypes.h>
-#include <unistd.h>
 #endif
+#include <stdlib.h>
+#include <stdint.h>
 #include "libnvram.h"
 #include "crc32.h"
 
