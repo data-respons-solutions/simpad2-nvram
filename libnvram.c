@@ -174,22 +174,16 @@ static uint32_t u32tole(uint32_t host)
 			| ((uint32_t) data[3] << 24);
 }
 
-// Size of counter, len and crc32
 #define NVRAM_HEADER_COUNTER_OFFSET 0
 #define NVRAM_HEADER_SIZE_OFFSET 4
 #define NVRAM_HEADER_DATA_CRC32_OFFSET 8
 #define NVRAM_HEADER_HEADER_CRC32_OFFSET 12
-#define NVRAM_HEADER_DATA_OFFSET 16
 #define NVRAM_HEADER_SIZE sizeof(uint32_t) * 4
-#define NVRAM_MIN_SIZE NVRAM_HEADER_SIZE + NVRAM_ENTRY_MIN_SIZE
 
 #define NVRAM_ENTRY_KEY_LEN_OFFSET 0
 #define NVRAM_ENTRY_VALUE_LEN_OFFSET 4
 #define NVRAM_ENTRY_DATA_OFFSET 8
-// Size of key_len and value_len
 #define NVRAM_ENTRY_HEADER_SIZE sizeof(uint32_t) * 2
-//Minimum possible size of an entry where both key and value are 1 char each
-#define NVRAM_ENTRY_MIN_SIZE NVRAM_ENTRY_HEADER_SIZE + 2
 
 uint32_t nvram_header_len()
 {
@@ -208,9 +202,9 @@ int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header
 		return -EFAULT;
 	}
 
-	hdr->counter = letou32(data);
-	hdr->data_len = letou32(data + 4);
-	hdr->data_crc32 = letou32(data + 8);
+	hdr->counter = letou32(data + NVRAM_HEADER_COUNTER_OFFSET);
+	hdr->data_len = letou32(data + NVRAM_HEADER_SIZE_OFFSET);
+	hdr->data_crc32 = letou32(data + NVRAM_HEADER_DATA_CRC32_OFFSET);
 	hdr->header_crc32 = hdr_crc;
 
 	return 0;
@@ -219,7 +213,10 @@ int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header
 // returns 0 for ok or negative errno for error
 static int validate_entry(const uint8_t* data, uint32_t len, struct nvram_entry* entry)
 {
-	if (len < NVRAM_ENTRY_MIN_SIZE) {
+	//Minimum possible size of an entry where both key and value are 1 char each
+	const uint32_t min_size = NVRAM_ENTRY_HEADER_SIZE + 2;
+
+	if (len < min_size) {
 		return -EFAULT;
 	}
 
