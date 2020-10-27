@@ -8,25 +8,30 @@ extern "C" {
 #include <stdint.h>
 
 /*
- * Serialized data is stored on nvram in two separate sections where section format is:
+ * This is a library for serializing key value pairs into non-volatile storage.
+ * Keys used shall be unique. If identical keys are parsed then the last key
+ * will take precedence.
  *
- * counter|len|data_crc32|hdr_crc32|serialized_data
+ * Serialized format:
  *
- * uint32_t counter = Counter iterated for each write
- * uint32_t len = Length of serialized data
- * uint32_t data_crc32 = crc32 for serialized data.
- * uint32_t hdr_crc32 = crc32 for serialized header.
- * uint8_t[] data = serialized data
+ *             HEADER              |                   DATA
+ * -------------------------------------------------------------------------
+ *                                 |            entry1           | entry..N
+ * counter|len|data_crc32|hdr_crc32|key_len|value_len| key |value|........
+ *   u32  |u32|    u32   |    u32  |  u32  |   u32   |u8..N|u8..N|........
+ * -------------------------------------------------------------------------
  *
+ * Header:
+ * counter = Value decided by caller
+ * len = Length of DATA section
+ * data_crc32 = crc32 of DATA section
+ * hdr_crc32 = crc32 of header, not including self
  *
- *
- * Serialized data is stored as key/value entries in format:
- * key_len|value_len|key|value
- *
- * uint32_t key_len = Length of key string
- * uint32_t value_len = Lenght of value string
- * uint8_t[] key = Key string NOT including null terminator
- * uint8_t[] value = Value string NOT including null terminator
+ * Entry:
+ * key_len = length of key
+ * value_len = length of value
+ * key = key bytes
+ * value = value bytes
  */
 
 struct nvram_entry {
