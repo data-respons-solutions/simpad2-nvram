@@ -196,9 +196,6 @@ static uint32_t u32tole(uint32_t host)
 //Minimum possible size of an entry where both key and value are 1 char each
 #define NVRAM_ENTRY_MIN_SIZE NVRAM_ENTRY_HEADER_SIZE + 2
 
-#define NVRAM_CRC32_INIT	0xffffffff
-#define NVRAM_CRC32_XOR		0xffffffff
-
 uint32_t nvram_header_len()
 {
 	return NVRAM_HEADER_SIZE;
@@ -210,7 +207,7 @@ int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header
 		return -EINVAL;
 	}
 
-	uint32_t crc = calc_crc32(NVRAM_CRC32_INIT, data, NVRAM_HEADER_HEADER_CRC32_OFFSET) ^ NVRAM_CRC32_XOR;
+	uint32_t crc = calc_crc32(data, NVRAM_HEADER_HEADER_CRC32_OFFSET);
 	uint32_t hdr_crc = letou32(data + NVRAM_HEADER_HEADER_CRC32_OFFSET);
 	if (crc != hdr_crc) {
 		return -EFAULT;
@@ -257,7 +254,7 @@ int nvram_validate_data(const uint8_t* data, uint32_t len, const struct nvram_he
 		return -EINVAL;
 	}
 
-	uint32_t crc = calc_crc32(NVRAM_CRC32_INIT, data, hdr->data_len) ^ NVRAM_CRC32_XOR;
+	uint32_t crc = calc_crc32(data, hdr->data_len);
 	if (crc != hdr->data_crc32) {
 		return -EFAULT;
 	}
@@ -321,7 +318,6 @@ uint32_t nvram_serialize_size(const struct nvram_list* list)
 	return size;
 }
 
-
 static uint32_t write_entry(uint8_t* data, const struct nvram_entry* entry)
 {
 	const uint32_t le_key_len = u32tole(entry->key_len);
@@ -341,7 +337,7 @@ static void write_header(uint8_t* data, struct nvram_header* hdr)
 	memcpy(data + NVRAM_HEADER_COUNTER_OFFSET, &le_counter, sizeof(le_counter));
 	memcpy(data + NVRAM_HEADER_SIZE_OFFSET, &le_data_len, sizeof(le_data_len));
 	memcpy(data + NVRAM_HEADER_DATA_CRC32_OFFSET, &le_data_crc32, sizeof(le_data_crc32));
-	hdr->header_crc32 = calc_crc32(NVRAM_CRC32_INIT, data, NVRAM_HEADER_HEADER_CRC32_OFFSET) ^ NVRAM_CRC32_XOR;
+	hdr->header_crc32 = calc_crc32(data, NVRAM_HEADER_HEADER_CRC32_OFFSET);
 	uint32_t le_header_crc32 = hdr->header_crc32;
 	memcpy(data + NVRAM_HEADER_HEADER_CRC32_OFFSET, &le_header_crc32, sizeof(le_header_crc32));
 }
@@ -359,7 +355,7 @@ uint32_t nvram_serialize(const struct nvram_list* list, uint8_t* data, uint32_t 
 	}
 
 	hdr->data_len = pos - NVRAM_HEADER_SIZE;
-	hdr->data_crc32 = calc_crc32(NVRAM_CRC32_INIT, data + NVRAM_HEADER_SIZE, hdr->data_len) ^ NVRAM_CRC32_XOR;
+	hdr->data_crc32 = calc_crc32(data + NVRAM_HEADER_SIZE, hdr->data_len);
 
 	write_header(data, hdr);
 
