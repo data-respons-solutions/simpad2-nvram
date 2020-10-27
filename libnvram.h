@@ -13,11 +13,12 @@ extern "C" {
 /*
  * Serialized data is stored on nvram in two separate sections where section format is:
  *
- * counter|len|crc32|serialized_data
+ * counter|len|data_crc32|hdr_crc32|serialized_data
  *
  * uint32_t counter = Counter iterated for each write
  * uint32_t len = Length of serialized data
- * uint32_t crc32 = crc32 for serialized data. This field zeroed during calculation
+ * uint32_t data_crc32 = crc32 for serialized data.
+ * uint32_t hdr_crc32 = crc32 for serialized header.
  * uint8_t[] data = serialized data
  *
  *
@@ -77,62 +78,69 @@ int nvram_list_remove(struct nvram_list** list, const uint8_t* key, uint32_t key
  */
 void destroy_nvram_list(struct nvram_list** list);
 
-/*
- * Verify buffer contains valid nvram section
- *
- * @params
- *   data: data buffer
- *   max_len: Length of buffer
- *   data_len: returns length of serialized data
- *   counter: returns nvram section header counter
- *
- * @returns
- *   0 for invalid, 1 for valid
- */
-int is_valid_nvram_section(const uint8_t* data, uint32_t len, uint32_t* data_len, uint32_t* counter);
+struct nvram_header {
+	uint32_t counter;
+	uint32_t data_len;
+	uint32_t data_crc32;
+	uint32_t header_crc32;
+};
 
 /*
- * Create nodes from serialized data buffer.
- * This function expects nvram section is valid.
+ * Returns length of serialized nvram header.
+ * Useful if first validating header before reading data.
+ */
+uint32_t nvram_header_len();
+
+/*
+ * Validate and return header from data buffer
  *
- * @params
- *  list: returns list with entries (Resource should be released with destroy_nvram_node() by caller)
- *  data: data buffer
- *  len:  data buffer length
+ * @returns
+ *   0 for valid
+ *   negative errno for error
+ *     -EINVAL: invalid argument
+ *     -EFAULT: crc32 mismatch
+ */
+int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header* hdr);
+
+/*
+ * Validate data as described by hdr
+ *
+ * @returns
+ *   0 for valid
+ *   negative errno for error
+ *     -EINVAL: invalid argument
+ *     -EFAULT: crc32 mismatch or data invalid
+ */
+int nvram_validate_data(const uint8_t* data, uint32_t len, const struct nvram_header* hdr);
+
+/*
+ * Returns nvram_list from validated data as described by hdr.
+ * Partial list will not be returned if errors are detected.
+ *
+ * nvram_list should be destroyed by caller, see destroy_nvram_list()
  *
  * @returns
  *  0 for success
  *  Negative errno for error
  */
-int nvram_section_deserialize(struct nvram_list** list, const uint8_t* data, uint32_t len);
+int nvram_deserialize(struct nvram_list** list, const uint8_t* data, uint32_t len, const struct nvram_header* hdr);
 
 /*
- * Returns size needed for serialized buffer
- *
- * @params
- *   list: list with entires
- *   size: returns buffer size needed
- *
- * @returns
- *   0 for success
- *   Negative errno for error
+ * Returns size needed for serializing list.
+ * Useful for allocating buffer for nvram_serialize().
  */
-int nvram_section_serialize_size(const struct nvram_list* list, uint32_t* size);
+uint32_t nvram_serialize_size(const struct nvram_list* list);
 
 /*
- * Create serialized data buffer from nodes
- *
- * @params
- *  list: list with entries
- *  counter: Value of counter to insert into section header
- *  data: data buffer
- *  size: size of buffer
- *
+ * Create serialized data buffer from list.
+ * Reads counter value from header.
+ * Returns data_len, data_crc32 and header_crc32 in hdr.
+
  * @returns
- *  0 for success
- *  Negative errno for error
+ * Bytes used
+ * 0 for error (Most likely buffer too small)
  */
-int nvram_section_serialize(const struct nvram_list* list, uint32_t counter, uint8_t* data, uint32_t size);
+uint32_t nvram_serialize(const struct nvram_list* list, uint8_t* data, uint32_t len, struct nvram_header* hdr);
 
 #ifdef __cplusplus
 }

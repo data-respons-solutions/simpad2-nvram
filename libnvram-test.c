@@ -34,67 +34,158 @@ static void fill_entry(struct nvram_entry* entry, const char* key, const char* v
 	entry->value_len = strlen(value);
 }
 
-static int test_nvram_section()
+static int test_nvram_header_size()
 {
-	const uint8_t test_section1[] = {
-		0x10, 0x00, 0x00, 0x00, 0x27, 0x00, 0x00, 0x00, 0x78, 0x97, 0xbf, 0xef, \
-		0x5, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x54, 0x45, 0x53, \
-		0x54, 0x31, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, \
-		0x69, 0x6a, 0x5, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x54, \
+	if (nvram_header_len() != 16) {
+		printf("nvram_header_len != 16\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+static int test_nvram_validate_header()
+{
+	const uint8_t test_section[] = {
+		0x10, 0x00, 0x00, 0x00,
+		0x27, 0x00, 0x00, 0x00,
+		0x78, 0x97, 0xbf, 0xef,
+		0x77, 0xbe, 0x15, 0x63,
+	};
+
+	struct nvram_header hdr;
+	int r = nvram_validate_header(test_section, sizeof(test_section), &hdr);
+	if (r) {
+		printf("nvram_validate_header: %s\n", strerror(-r));
+		return 0;
+	}
+
+	if (hdr.counter != 16) {
+		printf("header wrong counter returned\n");
+		return 0;
+	}
+
+	if (hdr.data_len != 39) {
+		printf("header wrong data_len returned\n");
+		return 0;
+	}
+
+	if (hdr.data_crc32 != 0xefbf9778) {
+		printf("header wrong data_crc32 returned\n");
+		return 0;
+	}
+
+	if (hdr.header_crc32 != 0x6315be77) {
+		printf("header wrong header_crc32 returned\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+static int test_nvram_validate_header_corrupt()
+{
+	const uint8_t test_section[] = {
+		0x10, 0x00, 0x00, 0x00,
+		0x27, 0x00, 0x00, 0x00,
+		0x78, 0x97, 0xbf, 0xef,
+		0x77, 0xbe, 0x15, 0x64,
+	};
+
+	struct nvram_header hdr;
+	int r = nvram_validate_header(test_section, sizeof(test_section), &hdr);
+	if (!r) {
+		printf("nvram_validate_header no error\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+static int test_nvram_validate_data()
+{
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	hdr.data_len = 39;
+	hdr.data_crc32 = 0x6c9dd729;
+
+	const uint8_t test_section[] = {
+		0x05, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+		0x54, 0x45, 0x53, 0x54, 0x31, 0x61, 0x62, 0x63,
+		0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x05,
+		0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x54,
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	const uint8_t test_section2[] = {
-		0x5, 0x00, 0x00, 0x00, 0x27, 0x00, 0x00, 0x00, 0x78, 0x97, 0xbf, 0xef, \
-		0x5, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x54, 0x45, 0x53, \
-		0x54, 0x31, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, \
-		0x69, 0x6a, 0x5, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x54, \
-		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
+	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
+	if (r) {
+		printf("nvram_validate_data: %s\n", strerror(-r));
+		return 0;
+	}
+
+	return 1;
+}
+
+static int test_nvram_validate_data_crc_corrupt()
+{
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	hdr.data_len = 39;
+	hdr.data_crc32 = 0x6c9dd729;
+
+	const uint8_t test_section[] = {
+			0x05, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+			0x54, 0x45, 0x53, 0x54, 0x31, 0x61, 0x62, 0x63,
+			0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x05,
+			0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x54,
+			0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x67
 	};
 
-	uint32_t data_len_1 = 0;
-	uint32_t data_len_2 = 0;
-	uint32_t counter_1 = 1;
-	uint32_t counter_2 = 2;
-
-	if (is_valid_nvram_section((uint8_t*) &test_section1, sizeof(test_section1), &data_len_1, &counter_1)) {
-		return 1;
+	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
+	if (!r) {
+		printf("nvram_validate_data no error\n");
+		return 0;
 	}
 
-	if (counter_1 != 16) {
-		printf("test_section1 wrong counter returned\n");
-		return 1;
+	return 1;
+}
+
+static int test_nvram_validate_data_entry_corrupt()
+{
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	hdr.data_len = 39;
+	hdr.data_crc32 = 0x5cc70915;
+
+	const uint8_t test_section[] = {
+			0x05, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+			0x54, 0x45, 0x53, 0x54, 0x31, 0x61, 0x62, 0x63,
+			0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x05,
+			0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x54,
+			0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
+	};
+
+	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
+	if (!r) {
+		printf("nvram_validate_data no error\n");
+		return 0;
 	}
 
-	if (data_len_1 != 39) {
-		printf("test_section1 wrong data_len returned\n");
-		return 1;
-	}
-
-	if (is_valid_nvram_section((uint8_t*) &test_section2, sizeof(test_section2), &data_len_2, &counter_2)) {
-		return 1;
-	}
-
-	if (counter_2 != 5) {
-		printf("test_section2 wrong counter returned\n");
-		return 1;
-	}
-
-	if (data_len_2 != 39) {
-		printf("test_section2 wrong data_len returned\n");
-		return 1;
-	}
-
-	return 0;
+	return 1;
 }
 
 static int test_nvram_deserialize()
 {
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	hdr.data_len = 39;
+	hdr.data_crc32 = 0x6c9dd729;
+
 	const uint8_t test_section[] = {
-		0x10, 0x00, 0x00, 0x00, 0x27, 0x00, 0x00, 0x00, 0x78, 0x97, 0xbf, 0xef, \
-		0x5, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x54, 0x45, 0x53, \
-		0x54, 0x31, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, \
-		0x69, 0x6a, 0x5, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x54, \
+		0x05, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+		0x54, 0x45, 0x53, 0x54, 0x31, 0x61, 0x62, 0x63,
+		0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x05,
+		0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x54,
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
@@ -104,7 +195,7 @@ static int test_nvram_deserialize()
 	fill_entry(&entry2, "TEST2", "def");
 
 	struct nvram_list *list = NULL;
-	int r = nvram_section_deserialize(&list, (uint8_t*) &test_section, sizeof(test_section));
+	int r = nvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
 	if (r) {
 		printf("nvram_section_deserialize failed: %s\n", strerror(-r));
 		goto error_exit;
@@ -133,13 +224,47 @@ error_exit:
 	return 0;
 }
 
+static int test_nvram_serialize_size()
+{
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abcdefghij");
+	struct nvram_list *list = NULL;
+	int r = nvram_list_set(&list, &entry1);
+	if (r) {
+		printf("nvram_list_set: %s\n", strerror(-r));
+		goto error_exit;
+	}
+
+	uint32_t size = nvram_serialize_size(list);
+	if (size != 39) {
+		printf("returned %u != 39\n", size);
+		goto error_exit;
+	}
+
+	destroy_nvram_list(&list);
+
+	return 1;
+
+error_exit:
+	destroy_nvram_list(&list);
+	return 0;
+}
+
 static int test_nvram_serialize()
 {
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	//hdr.data_len = 39;
+	//hdr.data_crc32 = 0x6c9dd729;
+	//hdr.header_crc32 = 0x0b4ad6e8
+
 	const uint8_t test_section[] = {
-		0x10, 0x00, 0x00, 0x00, 0x27, 0x00, 0x00, 0x00, 0x78, 0x97, 0xbf, 0xef, \
-		0x5, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x54, 0x45, 0x53, \
-		0x54, 0x31, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, \
-		0x69, 0x6a, 0x5, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x54, \
+		0x10, 0x00, 0x00, 0x00, 0x27, 0x00, 0x00, 0x00,
+		0x29, 0xd7, 0x9d, 0x6c,	0xe8, 0xd6, 0x4a, 0x0b,
+		0x05, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+		0x54, 0x45, 0x53, 0x54, 0x31, 0x61, 0x62, 0x63,
+		0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x05,
+		0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x54,
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
@@ -147,10 +272,7 @@ static int test_nvram_serialize()
 	fill_entry(&entry1, "TEST1", "abcdefghij");
 	struct nvram_entry entry2;
 	fill_entry(&entry2, "TEST2", "def");
-
 	struct nvram_list *list = NULL;
-	uint8_t* data = NULL;
-	uint32_t size = 0;
 	int r = nvram_list_set(&list, &entry1);
 	if (r) {
 		printf("nvram_list_set failed: %s\n", strerror(-r));
@@ -162,44 +284,44 @@ static int test_nvram_serialize()
 		goto error_exit;
 	}
 
-	r = nvram_section_serialize_size(list, &size);
-	if (r) {
-		printf("nvram_section_serialize_size failed: %s\n", strerror(-r));
+	uint32_t size = sizeof(test_section);
+	uint8_t buf[sizeof(test_section)];
+
+	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
+	if (bytes != size) {
+		printf("nvram_serialize: returned %u != %u\n", bytes, size);
 		goto error_exit;
 	}
 
-	data = malloc(size);
-	if (!data) {
-		printf("malloc failed\n");
+	if (hdr.data_len != 39) {
+		printf("hdr.data_len: %u != %u\n", hdr.data_len, size);
 		goto error_exit;
 	}
 
-	r = nvram_section_serialize(list, 0x10, data, size);
-	if (r) {
-		printf("nvram_section_serialize failed: %s\n", strerror(-r));
+	if (hdr.counter != 16) {
+		printf("hdr.counter: %u != %u\n", hdr.counter, 16);
 		goto error_exit;
 	}
 
-	if (sizeof(test_section) != size) {
-		printf("serialized string wrong size %" PRIu32 " != %zu\n", size, sizeof(test_section));
+	if (hdr.data_crc32 != 0x6c9dd729) {
+		printf("hdr.data_crc32: %04x != %04x\n", hdr.data_crc32, 0x6c9dd729);
 		goto error_exit;
 	}
 
-	if (memcmp(data, test_section, size)) {
-		printf("serialized string corrupt\n");
+	if (hdr.header_crc32 != 0x0b4ad6e8) {
+		printf("hdr.header_crc32: %04x != %04x\n", hdr.header_crc32, 0x0b4ad6e8);
 		goto error_exit;
 	}
 
-	if (data) {
-		free(data);
+	if (memcmp(test_section, buf, size)) {
+		printf("buf != test_section\n");
+		goto error_exit;
 	}
+
 	destroy_nvram_list(&list);
 	return 1;
 
 error_exit:
-	if (data) {
-		free(data);
-	}
 	destroy_nvram_list(&list);
 	return 0;
 }
@@ -212,8 +334,14 @@ struct test {
 #define FUNC_NAME(NAME) #NAME
 
 struct test test_array[] = {
-		{FUNC_NAME(test_nvram_section), &test_nvram_section},
+		{FUNC_NAME(test_nvram_header_size), &test_nvram_header_size},
+		{FUNC_NAME(test_nvram_validate_header), &test_nvram_validate_header},
+		{FUNC_NAME(test_nvram_validate_header_corrupt), &test_nvram_validate_header_corrupt},
+		{FUNC_NAME(test_nvram_validate_data), &test_nvram_validate_data},
+		{FUNC_NAME(test_nvram_validate_data_crc_corrupt), &test_nvram_validate_data_crc_corrupt},
+		{FUNC_NAME(test_nvram_validate_data_entry_corrupt), &test_nvram_validate_data_entry_corrupt},
 		{FUNC_NAME(test_nvram_deserialize), &test_nvram_deserialize},
+		{FUNC_NAME(test_nvram_serialize_size), &test_nvram_serialize_size},
 		{FUNC_NAME(test_nvram_serialize), &test_nvram_serialize},
 		{NULL, NULL},
 };
