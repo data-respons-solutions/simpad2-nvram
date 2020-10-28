@@ -222,6 +222,85 @@ error_exit:
 	return 0;
 }
 
+static int test_nvram_deserialize_single()
+{
+	struct nvram_header hdr;
+	hdr.counter = 1;
+	hdr.data_len = 25;
+	hdr.data_crc32 = 0x6c9dd729;
+
+	const uint8_t test_section[] = {
+		0x06, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00,
+		0x54, 0x45, 0x53, 0x54, 0x31, 0x00, 0x61, 0x62,
+		0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a,
+		0x00
+	};
+
+	struct nvram_entry entry1;
+	const char* key = "TEST1";
+	const char* value = "abcdefghij";
+	entry1.key = (uint8_t*) key;
+	entry1.key_len = strlen(key) + 1;
+	entry1.value = (uint8_t*) value;
+	entry1.value_len = strlen(value) + 1;
+
+	struct nvram_list *list = NULL;
+	int r = nvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
+	if (r) {
+		printf("nvram_section_deserialize failed [%d]: %s\n", -r, strerror(-r));
+		goto error_exit;
+	}
+
+	if (!list) {
+		printf("list empty\n");
+		goto error_exit;
+	}
+
+	if (entrycmp(list->entry, &entry1)) {
+		printf("entry1 wrong\n");
+		goto error_exit;
+	}
+
+	destroy_nvram_list(&list);
+	return 1;
+
+error_exit:
+	destroy_nvram_list(&list);
+	return 0;
+}
+
+static int test_nvram_deserialize_empty_data()
+{
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	hdr.data_len = 0;
+	hdr.data_crc32 = 0x00000000;
+	hdr.header_crc32 = 0x890d9bbe;
+
+	struct nvram_list *list = NULL;
+	const uint8_t test_section[] = {
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00
+	};
+
+	int r = nvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
+	if (r) {
+		printf("nvram_section_deserialize failed: %s\n", strerror(-r));
+		goto error_exit;
+	}
+
+	if (list) {
+		printf("list not empty\n");
+		goto error_exit;
+	}
+
+	return 1;
+
+error_exit:
+	destroy_nvram_list(&list);
+	return 0;
+}
+
 static int test_nvram_serialize_size()
 {
 	struct nvram_entry entry1;
@@ -245,6 +324,21 @@ static int test_nvram_serialize_size()
 
 error_exit:
 	destroy_nvram_list(&list);
+	return 0;
+}
+
+static int test_nvram_serialize_size_empty_data()
+{
+	struct nvram_list *list = NULL;
+	uint32_t size = nvram_serialize_size(list);
+	if (size != 16) {
+		printf("returned %u != 16\n", size);
+		goto error_exit;
+	}
+
+	return 1;
+
+error_exit:
 	return 0;
 }
 
@@ -292,7 +386,7 @@ static int test_nvram_serialize()
 	}
 
 	if (hdr.data_len != 39) {
-		printf("hdr.data_len: %u != %u\n", hdr.data_len, size);
+		printf("hdr.data_len: %u != %u\n", hdr.data_len, 39);
 		goto error_exit;
 	}
 
@@ -308,6 +402,65 @@ static int test_nvram_serialize()
 
 	if (hdr.header_crc32 != 0x0b4ad6e8) {
 		printf("hdr.header_crc32: %04x != %04x\n", hdr.header_crc32, 0x0b4ad6e8);
+		goto error_exit;
+	}
+
+	if (memcmp(test_section, buf, size)) {
+		printf("buf != test_section\n");
+		goto error_exit;
+	}
+
+	destroy_nvram_list(&list);
+	return 1;
+
+error_exit:
+	destroy_nvram_list(&list);
+	return 0;
+}
+
+static int test_nvram_serialize_empty_data()
+{
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	//hdr.data_len = 0;
+	//hdr.data_crc32 = 0x00000000;
+	//hdr.header_crc32 = 0x890d9bbe
+
+	const uint8_t test_section[] = {
+		0x10, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0xbe, 0x9b, 0x0d, 0x89,
+	};
+
+	struct nvram_list *list = NULL;
+
+	uint32_t size = sizeof(test_section);
+	uint8_t buf[size];
+
+	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
+	if (bytes != size) {
+		printf("nvram_serialize: returned %u != %u\n", bytes, size);
+		goto error_exit;
+	}
+
+	if (hdr.data_len != 0) {
+		printf("hdr.data_len: %u != %u\n", hdr.data_len, 0);
+		goto error_exit;
+	}
+
+	if (hdr.counter != 16) {
+		printf("hdr.counter: %u != %u\n", hdr.counter, 16);
+		goto error_exit;
+	}
+
+	if (hdr.data_crc32 != 0x00000000) {
+		printf("hdr.data_crc32: %04x != %04x\n", hdr.data_crc32, 0x00000000);
+		goto error_exit;
+	}
+
+	if (hdr.header_crc32 != 0x890d9bbe) {
+		printf("hdr.header_crc32: %04x != %04x\n", hdr.header_crc32, 0x890d9bbe);
 		goto error_exit;
 	}
 
@@ -398,8 +551,12 @@ struct test test_array[] = {
 		{FUNC_NAME(test_nvram_validate_data_crc_corrupt), &test_nvram_validate_data_crc_corrupt},
 		{FUNC_NAME(test_nvram_validate_data_entry_corrupt), &test_nvram_validate_data_entry_corrupt},
 		{FUNC_NAME(test_nvram_deserialize), &test_nvram_deserialize},
+		{FUNC_NAME(test_nvram_deserialize_single), &test_nvram_deserialize_single},
+		{FUNC_NAME(test_nvram_deserialize_empty_data), &test_nvram_deserialize_empty_data},
 		{FUNC_NAME(test_nvram_serialize_size), &test_nvram_serialize_size},
+		{FUNC_NAME(test_nvram_serialize_size_empty_data), &test_nvram_serialize_size_empty_data},
 		{FUNC_NAME(test_nvram_serialize), &test_nvram_serialize},
+		{FUNC_NAME(test_nvram_serialize_empty_data), &test_nvram_serialize_empty_data},
 		{FUNC_NAME(test_iterator), &test_iterator},
 		{NULL, NULL},
 };
