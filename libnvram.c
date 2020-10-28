@@ -10,7 +10,6 @@
 #include <linux/types.h>
 #else
 #include <string.h>
-#include <errno.h>
 #endif
 #include <stdlib.h>
 #include <stdint.h>
@@ -79,7 +78,7 @@ int nvram_list_set(struct nvram_list** list, const struct nvram_entry* entry)
 
 	struct nvram_entry *new = create_nvram_entry(entry->key, entry->key_len, entry->value, entry->value_len);
 	if (!new) {
-		return -ENOMEM;
+		return -NVRAM_ERROR_NOMEM;
 	}
 
 	if (!cur) {
@@ -87,7 +86,7 @@ int nvram_list_set(struct nvram_list** list, const struct nvram_entry* entry)
 		cur = malloc(sizeof(struct nvram_list));
 		if (!cur) {
 			destroy_nvram_entry(new);
-			return -ENOMEM;
+			return -NVRAM_ERROR_NOMEM;
 		}
 		cur->entry = new;
 		cur->next = NULL;
@@ -193,13 +192,13 @@ uint32_t nvram_header_len()
 int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header* hdr)
 {
 	if (len < NVRAM_HEADER_SIZE) {
-		return -EINVAL;
+		return -NVRAM_ERROR_INVALID;
 	}
 
 	uint32_t crc = calc_crc32(data, NVRAM_HEADER_HEADER_CRC32_OFFSET);
 	uint32_t hdr_crc = letou32(data + NVRAM_HEADER_HEADER_CRC32_OFFSET);
 	if (crc != hdr_crc) {
-		return -EFAULT;
+		return -NVRAM_ERROR_CRC;
 	}
 
 	hdr->counter = letou32(data + NVRAM_HEADER_COUNTER_OFFSET);
@@ -217,14 +216,14 @@ static int validate_entry(const uint8_t* data, uint32_t len, struct nvram_entry*
 	const uint32_t min_size = NVRAM_ENTRY_HEADER_SIZE + 2;
 
 	if (len < min_size) {
-		return -EFAULT;
+		return -NVRAM_ERROR_ILLEGAL;
 	}
 
 	const uint32_t key_len = letou32(data + NVRAM_ENTRY_KEY_LEN_OFFSET);
 	const uint32_t value_len = letou32(data + NVRAM_ENTRY_VALUE_LEN_OFFSET);
 	const uint32_t required_len = key_len + value_len + NVRAM_ENTRY_HEADER_SIZE;
 	if (required_len > len) {
-		return -EFAULT;
+		return -NVRAM_ERROR_ILLEGAL;
 	}
 
 	entry->key = (uint8_t*) data + NVRAM_ENTRY_DATA_OFFSET;
@@ -243,12 +242,12 @@ static uint32_t entry_size(const struct nvram_entry* entry)
 int nvram_validate_data(const uint8_t* data, uint32_t len, const struct nvram_header* hdr)
 {
 	if (len < hdr->data_len) {
-		return -EINVAL;
+		return -NVRAM_ERROR_INVALID;
 	}
 
 	uint32_t crc = calc_crc32(data, hdr->data_len);
 	if (crc != hdr->data_crc32) {
-		return -EFAULT;
+		return -NVRAM_ERROR_CRC;
 	}
 
 	for (uint32_t i = 0; i < hdr->data_len;) {
@@ -267,10 +266,10 @@ int nvram_validate_data(const uint8_t* data, uint32_t len, const struct nvram_he
 int nvram_deserialize(struct nvram_list** list, const uint8_t* data, uint32_t len, const struct nvram_header* hdr)
 {
 	if (len < hdr->data_len) {
-		return -EINVAL;
+		return -NVRAM_ERROR_INVALID;
 	}
 	if (*list) {
-		return -EINVAL;
+		return -NVRAM_ERROR_INVALID;
 	}
 
 	struct nvram_list *_list = NULL;

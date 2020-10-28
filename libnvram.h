@@ -34,6 +34,13 @@ extern "C" {
  * value = value bytes
  */
 
+enum nvram_error {
+	NVRAM_ERROR_INVALID = 1,  // invalid argument
+	NVRAM_ERROR_NOMEM,        // memory allocation failed
+	NVRAM_ERROR_CRC,          // crc mismatch
+	NVRAM_ERROR_ILLEGAL,      // illegal format
+};
+
 struct nvram_entry {
 	uint8_t *key;
 	uint32_t key_len;
@@ -52,7 +59,7 @@ struct nvram_list {
  *
  * @returns
  *   0 for success
- *   negative errno for error
+ *   negative nvram_error for error
  */
 
 int nvram_list_set(struct nvram_list** list, const struct nvram_entry* entry);
@@ -98,9 +105,7 @@ uint32_t nvram_header_len();
  *
  * @returns
  *   0 for valid
- *   negative errno for error
- *     -EINVAL: invalid argument
- *     -EFAULT: crc32 mismatch
+ *   negative nvram_error for error
  */
 int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header* hdr);
 
@@ -109,9 +114,7 @@ int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header
  *
  * @returns
  *   0 for valid
- *   negative errno for error
- *     -EINVAL: invalid argument
- *     -EFAULT: crc32 mismatch or data invalid
+ *   negative nvram_error for error
  */
 int nvram_validate_data(const uint8_t* data, uint32_t len, const struct nvram_header* hdr);
 
@@ -123,7 +126,7 @@ int nvram_validate_data(const uint8_t* data, uint32_t len, const struct nvram_he
  *
  * @returns
  *  0 for success
- *  Negative errno for error
+ *  Negative nvram_error for error
  */
 int nvram_deserialize(struct nvram_list** list, const uint8_t* data, uint32_t len, const struct nvram_header* hdr);
 
