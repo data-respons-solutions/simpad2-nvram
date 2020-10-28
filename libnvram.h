@@ -147,6 +147,17 @@ uint32_t nvram_serialize_size(const struct nvram_list* list);
  */
 uint32_t nvram_serialize(const struct nvram_list* list, uint8_t* data, uint32_t len, struct nvram_header* hdr);
 
+/*
+ *  Iterate over validated data as described by header
+ *  Dereferencing end iterator is undefined behavior.
+ *
+ *  This is useful in environments where dynamic allocation for nvram_list is not possible.
+ */
+uint8_t* nvram_it_begin(const uint8_t* data, uint32_t len, const struct nvram_header* hdr);
+uint8_t* nvram_it_next(const uint8_t* it);
+uint8_t* nvram_it_end(const uint8_t* data, uint32_t len, const struct nvram_header* hdr);
+void nvram_it_deref(const uint8_t* it, struct nvram_entry* entry);
+
 #ifdef __cplusplus
 }
 #endif

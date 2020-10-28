@@ -209,7 +209,7 @@ int nvram_validate_header(const uint8_t* data, uint32_t len, struct nvram_header
 	return 0;
 }
 
-// returns 0 for ok or negative errno for error
+// returns 0 for ok or negative nvram_error for error
 static int validate_entry(const uint8_t* data, uint32_t len, struct nvram_entry* entry)
 {
 	//Minimum possible size of an entry where both key and value are 1 char each
@@ -351,4 +351,32 @@ uint32_t nvram_serialize(const struct nvram_list* list, uint8_t* data, uint32_t 
 	write_header(data, hdr);
 
 	return pos;
+}
+
+uint8_t* nvram_it_begin(const uint8_t* data, uint32_t len, const struct nvram_header* hdr)
+{
+	if (len < hdr->data_len) {
+		return NULL;
+	}
+	return (uint8_t*) data;
+}
+
+uint8_t* nvram_it_next(const uint8_t* it)
+{
+	struct nvram_entry entry;
+	validate_entry(it, UINT32_MAX, &entry);
+	return (uint8_t*) it + NVRAM_ENTRY_HEADER_SIZE + entry.key_len + entry.value_len;
+}
+
+uint8_t* nvram_it_end(const uint8_t* data, uint32_t len, const struct nvram_header* hdr)
+{
+	if (len < hdr->data_len) {
+		return NULL;
+	}
+	return (uint8_t*) data + hdr->data_len;
+}
+
+void nvram_it_deref(const uint8_t* it, struct nvram_entry* entry)
+{
+	validate_entry(it, UINT32_MAX, entry);
 }

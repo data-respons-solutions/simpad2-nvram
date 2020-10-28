@@ -324,6 +324,65 @@ error_exit:
 	return 0;
 }
 
+static int test_iterator()
+{
+	struct nvram_header hdr;
+	hdr.counter = 16;
+	hdr.data_len = 39;
+	hdr.data_crc32 = 0x6c9dd729;
+
+	const uint8_t test_section[] = {
+		0x05, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+		0x54, 0x45, 0x53, 0x54, 0x31, 0x61, 0x62, 0x63,
+		0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x05,
+		0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x54,
+		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
+	};
+
+	uint8_t *begin = nvram_it_begin(test_section, sizeof(test_section), &hdr);
+	if (begin != test_section) {
+		printf("nvram_it_begin not pointing to start of data\n");
+		goto error_exit;
+	}
+
+	uint8_t *end = nvram_it_end(test_section, sizeof(test_section), &hdr);
+	if (end != test_section + sizeof(test_section)) {
+		printf("nvram_it_end not pointing to end of data\n");
+		goto error_exit;
+	}
+
+	uint8_t* it = begin;
+	struct nvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abcdefghij");
+	struct nvram_entry entry;
+	nvram_it_deref(it, &entry);
+	if (entrycmp(&entry, &entry1)) {
+		printf("nvram_it_deref: 1st entry wrong\n");
+		goto error_exit;
+	}
+
+	it = nvram_it_next(it);
+	struct nvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
+	nvram_it_deref(it, &entry);
+	if (entrycmp(&entry, &entry2)) {
+		printf("nvram_it_deref: 2nd entry wrong\n");
+		goto error_exit;
+	}
+
+	it = nvram_it_next(it);
+	if (it != end) {
+		printf("nvram_it_next: did not end\n");
+		goto error_exit;
+	}
+
+	return 1;
+
+error_exit:
+	return 0;
+}
+
+
 struct test {
 	char* name;
 	int (*func)(void);
@@ -341,6 +400,7 @@ struct test test_array[] = {
 		{FUNC_NAME(test_nvram_deserialize), &test_nvram_deserialize},
 		{FUNC_NAME(test_nvram_serialize_size), &test_nvram_serialize_size},
 		{FUNC_NAME(test_nvram_serialize), &test_nvram_serialize},
+		{FUNC_NAME(test_iterator), &test_iterator},
 		{NULL, NULL},
 };
 
