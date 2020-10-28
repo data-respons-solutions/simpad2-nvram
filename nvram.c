@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <errno.h>
 #include <sys/types.h>
 #include "log.h"
@@ -18,8 +18,7 @@ struct nvram {
 struct nvram_section_data {
 	uint8_t* buf;
 	size_t buf_size;
-	uint32_t counter;
-	uint32_t data_len;
+	struct nvram_header hdr;
 	int is_valid;
 };
 
@@ -27,8 +26,6 @@ static int read_section(const struct nvram* nvram, enum nvram_section section, s
 {
 	int r = 0;
 	size_t size = 0;
-	uint32_t counter = 0;
-	uint32_t data_len = 0;
 	int is_valid = 0;
 	uint8_t *buf = NULL;
 
@@ -54,16 +51,18 @@ static int read_section(const struct nvram* nvram, enum nvram_section section, s
 					nvram_section_str(section), nvram_interface_path(nvram->priv, section), size, -r, strerror(-r));
 			goto error_exit;
 		}
-		is_valid = is_valid_nvram_section(buf, size, &data_len, &counter);
+		if (!nvram_validate_header(buf, size, &data->hdr)) {
+			if (!nvram_validate_data(buf + nvram_header_len(), size - nvram_header_len(), &data->hdr)) {
+				is_valid = 1;
+			}
+		}
 	}
 
 	pr_dbg("section %s: valid: %s: counter: %"PRIu32": data_len: %"PRIu32"\n",
-			nvram_section_str(section), is_valid ? "true" : "false", counter, data_len);
+			nvram_section_str(section), is_valid ? "true" : "false", data->hdr.counter, data->hdr.data_len);
 
 	data->buf = buf;
 	data->buf_size = size;
-	data->counter = counter;
-	data->data_len = data_len;
 	data->is_valid = is_valid;
 
 	return 0;
@@ -77,7 +76,7 @@ error_exit:
 
 static enum nvram_section find_active_section(const struct nvram_section_data* section_a, const struct nvram_section_data* section_b)
 {
-	if (section_a->is_valid && (section_a->counter > section_b->counter)) {
+	if (section_a->is_valid && (section_a->hdr.counter > section_b->hdr.counter)) {
 		return NVRAM_SECTION_A;
 	}
 	else
@@ -89,16 +88,18 @@ static enum nvram_section find_active_section(const struct nvram_section_data* s
 	}
 }
 
-int nvram_init(struct nvram** nvram, struct nvram_list* list, const char* section_a, const char* section_b)
+int nvram_init(struct nvram** nvram, struct nvram_list** list, const char* section_a, const char* section_b)
 {
 	int r = 0;
-	struct nvram_section_data data_a = {NULL,0,0,0,0};
-	struct nvram_section_data data_b = {NULL,0,0,0,0};
+	struct nvram_section_data data_a;
+	struct nvram_section_data data_b;
 	struct nvram *pnvram = (struct nvram*) malloc(sizeof(struct nvram));
 	if (!pnvram) {
 		return -ENOMEM;
 	}
 	memset(pnvram, 0, sizeof(struct nvram));
+	memset(&data_a, 0, sizeof(struct nvram_section_data));
+	memset(&data_b, 0, sizeof(struct nvram_section_data));
 
 	r = nvram_interface_init(&pnvram->priv, section_a, section_b);
 	if (r) {
@@ -120,21 +121,21 @@ int nvram_init(struct nvram** nvram, struct nvram_list* list, const char* sectio
 	switch (pnvram->section) {
 	case NVRAM_SECTION_A:
 		pr_dbg("section %s: %s: active\n", nvram_section_str(pnvram->section), nvram_interface_path(pnvram->priv, pnvram->section));
-		r = nvram_section_deserialize(list, data_a.buf, data_a.data_len);
+		r = nvram_deserialize(list, data_a.buf + nvram_header_len(), data_a.buf_size - nvram_header_len(), &data_a.hdr);
 		if (r) {
 			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
 			goto exit;
 		}
-		pnvram->counter = data_a.counter;
+		pnvram->counter = data_a.hdr.counter;
 		break;
 	case NVRAM_SECTION_B:
 		pr_dbg("section %s: %s: active\n", nvram_section_str(pnvram->section), nvram_interface_path(pnvram->priv, pnvram->section));
-		r = nvram_section_deserialize(list, data_b.buf, data_b.data_len);
+		r = nvram_deserialize(list, data_b.buf + nvram_header_len(), data_b.buf_size - nvram_header_len(), &data_b.hdr);
 		if (r) {
 			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
 			goto exit;
 		}
-		pnvram->counter = data_b.counter;
+		pnvram->counter = data_b.hdr.counter;
 		break;
 	case NVRAM_SECTION_UNKNOWN:
 		pr_dbg("no active section found\n");
@@ -162,14 +163,8 @@ exit:
 int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 {
 	uint8_t *buf = NULL;
-	uint32_t size = 0;
 	int r = 0;
-
-	r = nvram_section_serialize_size(list, &size);
-	if (r) {
-		pr_err("failed calculating serialized size of nvram data [%d]: %s\n", -r, strerror(-r));
-		goto exit;
-	}
+	uint32_t size = nvram_serialize_size(list);
 
 	buf = (uint8_t*) malloc(size);
 	if (!buf) {
@@ -178,10 +173,11 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 		goto exit;
 	}
 
-	uint32_t new_counter = nvram->counter + 1;
-	r = nvram_section_serialize(list, new_counter, buf, size);
-	if (r) {
-		pr_err("failed serializing nvram data [%d]: %s\n", -r, strerror(-r));
+	struct nvram_header hdr;
+	hdr.counter = nvram->counter + 1;
+	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
+	if (!bytes) {
+		pr_err("failed serializing nvram data\n");
 		goto exit;
 	}
 
@@ -203,7 +199,7 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 	}
 
 	nvram->section = new_section;
-	nvram->counter = new_counter;
+	nvram->counter = hdr.counter;
 	pr_dbg("section %s: valid: true: counter: %"PRIu32": data_len: %"PRIu32"\n",
 			nvram_section_str(nvram->section), nvram->counter, size);
 	pr_dbg("section %s: %s: active\n", nvram_section_str(nvram->section), nvram_interface_path(nvram->priv, nvram->section));

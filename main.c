@@ -270,9 +270,9 @@ int main(int argc, char** argv)
 	}
 
 	struct nvram *nvram_system = NULL;
-	struct nvram_list list_system = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list_system = NULL;
 	struct nvram *nvram_user = NULL;
-	struct nvram_list list_user = NVRAM_LIST_INITIALIZER;
+	struct nvram_list *list_user = NULL;
 
 	r = acquire_lockfile(NVRAM_LOCKFILE, &FDLOCK);
 	if (r) {
@@ -283,6 +283,8 @@ int main(int argc, char** argv)
 	const char *nvram_system_b = get_env_str(NVRAM_ENV_SYSTEM_B, xstr(NVRAM_SYSTEM_B));
 	pr_dbg("NVRAM_SYSTEM_A: %s\n", nvram_system_a);
 	pr_dbg("NVRAM_SYSTEM_B: %s\n", nvram_system_b);
+
+	struct nvram_entry *entry = NULL;
 
 	r = nvram_init(&nvram_system, &list_system, nvram_system_a, nvram_system_b);
 	if (r) {
@@ -302,45 +304,46 @@ int main(int argc, char** argv)
 	switch (opts.op) {
 	case OP_LIST:
 		pr_dbg("listing system\n");
-		struct nvram_node* cur = list_system.entry;
-		while(cur) {
-			printf("%s=%s\n", cur->key, cur->value);
-			cur = cur->next;
+		for (struct nvram_list *cur = list_system; cur; cur = cur->next) {
+			printf("%s=%s\n", (char*) cur->entry->key, (char*) cur->entry->value);
 		}
 		if(!opts.system_mode) {
 			pr_dbg("listing user\n");
-			cur = list_user.entry;
-			while(cur) {
-				printf("%s=%s\n", cur->key, cur->value);
-				cur = cur->next;
+			for (struct nvram_list *cur = list_user; cur; cur = cur->next) {
+				printf("%s=%s\n", (char*) cur->entry->key, (char*) cur->entry->value);
 			}
 		}
 		break;
 	case OP_GET:
 		pr_dbg("getting key from system: %s\n", opts.key);
-		opts.val = nvram_list_get(&list_system, opts.key);
-		if (!opts.val && !opts.system_mode) {
+		entry = nvram_list_get(list_system, (uint8_t*) opts.key, strlen(opts.key) + 1) ;
+		if (!entry && !opts.system_mode) {
 			pr_dbg("getting key from user: %s\n", opts.key);
-			opts.val = nvram_list_get(&list_user, opts.key);
+			entry = nvram_list_get(list_user, (uint8_t*) opts.key, strlen(opts.key) + 1);
 		}
-		if (!opts.val) {
+		if (!entry) {
 			pr_dbg("key not found: %s\n", opts.key);
 			r = -ENOENT;
 			goto exit;
 		}
-		printf("%s\n", opts.val);
+		printf("%s\n", (char*) entry->value);
 		break;
 	case OP_SET:
 		pr_dbg("setting %s: %s=%s\n", opts.system_mode ? "system" : "user", opts.key, opts.val);
-		const char* val = nvram_list_get(opts.system_mode ? &list_system : &list_user, opts.key);
-		if (!val || strcmp(val, opts.val)) {
-			r = nvram_list_set(opts.system_mode ? &list_system : &list_user, opts.key, opts.val);
+		entry = nvram_list_get(opts.system_mode ? list_system : list_user, (uint8_t*) opts.key, strlen(opts.key) + 1);
+		if (!entry || strcmp((char*) entry->value, opts.val)) {
+			struct nvram_entry new;
+			new.key = (uint8_t*) opts.key;
+			new.key_len = strlen(opts.key) + 1;
+			new.value = (uint8_t*) opts.val;
+			new.value_len = strlen(opts.val) + 1;
+			r = nvram_list_set(opts.system_mode ? &list_system : &list_user, &new);
 			if (r) {
 				pr_err("failed setting to list [%d]: %s\n", -r, strerror(-r));
 				goto exit;
 			}
 
-			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? &list_system : &list_user);
+			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? list_system : list_user);
 			if (r) {
 				goto exit;
 			}
@@ -348,8 +351,8 @@ int main(int argc, char** argv)
 		break;
 	case OP_DEL:
 		pr_dbg("deleting %s: %s\n", opts.system_mode ? "system" : "user", opts.key);
-		if(nvram_list_remove(opts.system_mode ? &list_system : &list_user, opts.key)) {
-			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? &list_system : &list_user);
+		if(nvram_list_remove(opts.system_mode ? &list_system : &list_user, (uint8_t*) opts.key, strlen(opts.key) + 1)) {
+			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? list_system : list_user);
 			if (r) {
 				goto exit;
 			}
@@ -361,8 +364,12 @@ int main(int argc, char** argv)
 
 exit:
 	release_lockfile(NVRAM_LOCKFILE, FDLOCK);
-	destroy_nvram_list(&list_system);
-	destroy_nvram_list(&list_user);
+	if (list_system) {
+		destroy_nvram_list(&list_system);
+	}
+	if (list_user) {
+		destroy_nvram_list(&list_user);
+	}
 	nvram_close(&nvram_system);
 	nvram_close(&nvram_user);
 	return -r;
