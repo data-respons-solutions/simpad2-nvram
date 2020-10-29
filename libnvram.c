@@ -380,3 +380,54 @@ void nvram_it_deref(const uint8_t* it, struct nvram_entry* entry)
 {
 	validate_entry(it, UINT32_MAX, entry);
 }
+
+static void validate_section(struct nvram_section* section, const uint8_t* data, uint32_t len)
+{
+	int r = nvram_validate_header(data, len, &section->hdr);
+	if (!r) {
+		section->state |= NVRAM_STATE_HEADER_VERIFIED;
+		if (len >= nvram_header_len()) {
+			r = nvram_validate_data(data + nvram_header_len(), len - nvram_header_len(), &section->hdr);
+			if (!r) {
+				section->state |= NVRAM_STATE_DATA_VERIFIED;
+			}
+		}
+	}
+}
+
+static enum nvram_active find_active(const struct nvram_section* section_a, const struct nvram_section* section_b)
+{
+	if (section_a->state == NVRAM_STATE_ALL_VERIFIED && (section_a->hdr.counter > section_b->hdr.counter)) {
+		return NVRAM_ACTIVE_A;
+	}
+	else
+	if (section_b->state == NVRAM_STATE_ALL_VERIFIED) {
+		return NVRAM_ACTIVE_B;
+	}
+	else {
+		return NVRAM_ACTIVE_NONE;
+	}
+}
+
+void nvram_init_transaction(struct nvram_transaction* trans, const uint8_t* data_a, uint32_t len_a, const uint8_t* data_b, uint32_t len_b)
+{
+	validate_section(&trans->section_a, data_a, len_a);
+	validate_section(&trans->section_b, data_b, len_b);
+	trans->active = find_active(&trans->section_a, &trans->section_b);
+}
+
+enum nvram_active nvram_next_transaction(const struct nvram_transaction* trans, struct nvram_header* hdr)
+{
+	switch (trans->active) {
+		case NVRAM_ACTIVE_A:
+			hdr->counter = trans->section_a.hdr.counter + 1;
+			return NVRAM_ACTIVE_B;
+		case NVRAM_ACTIVE_B:
+			hdr->counter = trans->section_b.hdr.counter + 1;
+			return NVRAM_ACTIVE_A;
+		default:
+			hdr->counter = 1;
+			return NVRAM_ACTIVE_A;
+	}
+}
+

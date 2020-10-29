@@ -158,6 +158,49 @@ uint8_t* nvram_it_next(const uint8_t* it);
 uint8_t* nvram_it_end(const uint8_t* data, uint32_t len, const struct nvram_header* hdr);
 void nvram_it_deref(const uint8_t* it, struct nvram_entry* entry);
 
+/*
+ * Transactional writes are a typical use case. We provide helper functions.
+ *
+ * The transaction API will iterate nvram_header->counter for each write
+ * which indicates the last used section
+ */
+
+enum nvram_state {
+	NVRAM_STATE_UNKNOWN         = 0,
+	NVRAM_STATE_HEADER_VERIFIED = 1 << 0,
+	NVRAM_STATE_DATA_VERIFIED   = 1 << 1,
+	NVRAM_STATE_ALL_VERIFIED    = NVRAM_STATE_HEADER_VERIFIED | NVRAM_STATE_DATA_VERIFIED,
+};
+
+struct nvram_section {
+	struct nvram_header hdr;
+	enum nvram_state state;
+};
+
+enum nvram_active {
+	NVRAM_ACTIVE_NONE = 0,
+	NVRAM_ACTIVE_A,
+	NVRAM_ACTIVE_B
+};
+
+struct nvram_transaction {
+	struct nvram_section section_a;
+	struct nvram_section section_b;
+	enum nvram_active active;
+};
+
+/*
+ * Validates header and data for both data_a and data_b.
+ * Results returned in nvram_transaction.
+ */
+void nvram_init_transaction(struct nvram_transaction* trans, const uint8_t* data_a, uint32_t len_a, const uint8_t* data_b, uint32_t len_b);
+
+/*
+ * Returns which section changes should be written to.
+ * The nvram_header returned from this function should be used for next nvram_serialize call.
+ */
+enum nvram_active nvram_next_transaction(const struct nvram_transaction* trans, struct nvram_header* hdr);
+
 #ifdef __cplusplus
 }
 #endif
