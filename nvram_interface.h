@@ -12,7 +12,7 @@
  *   nvram_interface_size => Always returns size 0 for section not in use
  */
 
-enum nvram_section {
+enum nvram_section_name {
 	NVRAM_SECTION_UNKNOWN = 0,
 	NVRAM_SECTION_A,
 	NVRAM_SECTION_B,
@@ -48,7 +48,7 @@ int nvram_interface_init(struct nvram_interface_priv** priv, const char* section
  *   0 for success
  *   negative errno for error
  */
-int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section section, size_t* size);
+int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section_name section, size_t* size);
 
 /*
  * Read from nvram device into buffer
@@ -63,7 +63,7 @@ int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section s
  *   0 for success (All "size" bytes read)
  *   negative errno for error
  */
-int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section section, uint8_t* buf, size_t size);
+int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section_name section, uint8_t* buf, size_t size);
 
 /*
  * Write from buffer into nvram device
@@ -78,7 +78,7 @@ int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section s
  *   0 for success (All "size" bytes written)
  *   negative errno for error
  */
-int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section section, const uint8_t* buf, size_t size);
+int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section_name section, const uint8_t* buf, size_t size);
 
 /*
  * Resolve section to path
@@ -91,10 +91,10 @@ int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section 
  *   pointer to path string
  *   NULL if unavailable
  */
-const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum nvram_section section);
+const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum nvram_section_name section);
 
 /*
- * Resolve enum nvram_section to string
+ * Resolve enum nvram_section_name to string
  *
  * @params
  *   section: Section
@@ -102,6 +102,6 @@ const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum n
  * @returns
  *   pointer to section string
  */
-const char* nvram_section_str(enum nvram_section section);
+const char* nvram_section_str(enum nvram_section_name section);
 
 #endif // _NVRAM_INTERFACE_H_

@@ -1,6 +1,6 @@
 #include "nvram_interface.h"
 
-const char* nvram_section_str(enum nvram_section section)
+const char* nvram_section_str(enum nvram_section_name section)
 {
 	switch(section) {
 	case NVRAM_SECTION_A:

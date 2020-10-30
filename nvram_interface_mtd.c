@@ -158,7 +158,7 @@ int nvram_interface_init(struct nvram_interface_priv** priv, const char* section
 	return 0;
 }
 
-int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section section, size_t* size)
+int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section_name section, size_t* size)
 {
 	switch (section) {
 	case NVRAM_SECTION_A:
@@ -174,7 +174,7 @@ int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section s
 	return 0;
 }
 
-int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section section, uint8_t* buf, size_t size)
+int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section_name section, uint8_t* buf, size_t size)
 {
 	if (!buf) {
 		return -EINVAL;
@@ -241,7 +241,7 @@ static int set_gpio(const char* path, bool value)
 	return -errno;
 }
 
-int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section section, const uint8_t* buf, size_t size)
+int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section_name section, const uint8_t* buf, size_t size)
 {
 	if (!buf) {
 		return -EINVAL;
@@ -300,7 +300,7 @@ exit:
 	return r;
 }
 
-const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum nvram_section section)
+const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum nvram_section_name section)
 {
 	switch (section) {
 	case NVRAM_SECTION_A:

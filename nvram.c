@@ -10,26 +10,28 @@
 #include "libnvram/libnvram.h"
 
 struct nvram {
-	enum nvram_section section;
-	uint32_t counter;
+	struct nvram_transaction trans;
 	struct nvram_interface_priv *priv;
 };
 
-struct nvram_section_data {
-	uint8_t* buf;
-	size_t buf_size;
-	struct nvram_header hdr;
-	int is_valid;
-};
-
-static int read_section(const struct nvram* nvram, enum nvram_section section, struct nvram_section_data* data)
+static enum nvram_section_name active_to_section(enum nvram_active active)
 {
-	int r = 0;
+	switch (active) {
+	case NVRAM_ACTIVE_A:
+		return NVRAM_SECTION_A;
+	case NVRAM_ACTIVE_B:
+		return NVRAM_SECTION_B;
+	default:
+		return NVRAM_SECTION_UNKNOWN;
+	}
+}
+
+static int read_section(const struct nvram* nvram, enum nvram_section_name section, uint8_t** data, size_t* len)
+{
 	size_t size = 0;
-	int is_valid = 0;
 	uint8_t *buf = NULL;
 
-	r = nvram_interface_size(nvram->priv, section, &size);
+	int r = nvram_interface_size(nvram->priv, section, &size);
 	if (r) {
 		pr_err("section %s: %s: failed getting size [%d]: %s\n",
 				nvram_section_str(section), nvram_interface_path(nvram->priv, section), -r, strerror(-r));
@@ -51,19 +53,10 @@ static int read_section(const struct nvram* nvram, enum nvram_section section, s
 					nvram_section_str(section), nvram_interface_path(nvram->priv, section), size, -r, strerror(-r));
 			goto error_exit;
 		}
-		if (!nvram_validate_header(buf, size, &data->hdr)) {
-			if (!nvram_validate_data(buf + nvram_header_len(), size - nvram_header_len(), &data->hdr)) {
-				is_valid = 1;
-			}
-		}
 	}
 
-	pr_dbg("section %s: valid: %s: counter: %"PRIu32": data_len: %"PRIu32"\n",
-			nvram_section_str(section), is_valid ? "true" : "false", data->hdr.counter, data->hdr.data_len);
-
-	data->buf = buf;
-	data->buf_size = size;
-	data->is_valid = is_valid;
+	*data = buf;
+	*len = size;
 
 	return 0;
 
@@ -74,71 +67,61 @@ error_exit:
 	return r;
 }
 
-static enum nvram_section find_active_section(const struct nvram_section_data* section_a, const struct nvram_section_data* section_b)
-{
-	if (section_a->is_valid && (section_a->hdr.counter > section_b->hdr.counter)) {
-		return NVRAM_SECTION_A;
-	}
-	else
-	if (section_b->is_valid) {
-		return NVRAM_SECTION_B;
-	}
-	else {
-		return NVRAM_SECTION_UNKNOWN;
-	}
-}
-
 int nvram_init(struct nvram** nvram, struct nvram_list** list, const char* section_a, const char* section_b)
 {
-	int r = 0;
-	struct nvram_section_data data_a;
-	struct nvram_section_data data_b;
+	uint8_t *buf_a = NULL;
+	size_t size_a = 0;
+	uint8_t *buf_b = NULL;
+	size_t size_b = 0;
 	struct nvram *pnvram = (struct nvram*) malloc(sizeof(struct nvram));
 	if (!pnvram) {
 		return -ENOMEM;
 	}
 	memset(pnvram, 0, sizeof(struct nvram));
-	memset(&data_a, 0, sizeof(struct nvram_section_data));
-	memset(&data_b, 0, sizeof(struct nvram_section_data));
 
-	r = nvram_interface_init(&pnvram->priv, section_a, section_b);
+	int r = nvram_interface_init(&pnvram->priv, section_a, section_b);
 	if (r) {
 		pr_err("failed initializing interface [%d]: %s\n", -r, strerror(-r));
 		goto exit;
 	}
 
-	r = read_section(pnvram, NVRAM_SECTION_A, &data_a);
+	r = read_section(pnvram, NVRAM_SECTION_A, &buf_a, &size_a);
 	if (r) {
 		goto exit;
 	}
 
-	r = read_section(pnvram, NVRAM_SECTION_B, &data_b);
+	r = read_section(pnvram, NVRAM_SECTION_B, &buf_b, &size_b);
 	if (r) {
 		goto exit;
 	}
 
-	pnvram->section = find_active_section(&data_a, &data_b);
-	switch (pnvram->section) {
-	case NVRAM_SECTION_A:
-		pr_dbg("section %s: %s: active\n", nvram_section_str(pnvram->section), nvram_interface_path(pnvram->priv, pnvram->section));
-		r = nvram_deserialize(list, data_a.buf + nvram_header_len(), data_a.buf_size - nvram_header_len(), &data_a.hdr);
+	if (size_a > UINT32_MAX || size_b > UINT32_MAX) {
+		r = -EINVAL;
+		pr_err("buffer size unsupported, larger than %u bytes\n", UINT32_MAX);
+		goto exit;
+	}
+
+	nvram_init_transaction(&pnvram->trans, buf_a, size_a, buf_b, size_b);
+	pr_dbg("section %s: %s: active\n",
+			nvram_section_str(active_to_section(pnvram->trans.active)),
+			nvram_interface_path(pnvram->priv, active_to_section(pnvram->trans.active)));
+
+	switch(pnvram->trans.active) {
+	case NVRAM_ACTIVE_A:
+		r = nvram_deserialize(list, buf_a + nvram_header_len(), size_a - nvram_header_len(), &pnvram->trans.section_a.hdr);
 		if (r) {
 			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
 			goto exit;
 		}
-		pnvram->counter = data_a.hdr.counter;
 		break;
-	case NVRAM_SECTION_B:
-		pr_dbg("section %s: %s: active\n", nvram_section_str(pnvram->section), nvram_interface_path(pnvram->priv, pnvram->section));
-		r = nvram_deserialize(list, data_b.buf + nvram_header_len(), data_b.buf_size - nvram_header_len(), &data_b.hdr);
+	case NVRAM_ACTIVE_B:
+		r = nvram_deserialize(list, buf_b + nvram_header_len(), size_b - nvram_header_len(), &pnvram->trans.section_b.hdr);
 		if (r) {
 			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
 			goto exit;
 		}
-		pnvram->counter = data_b.hdr.counter;
 		break;
-	case NVRAM_SECTION_UNKNOWN:
-		pr_dbg("no active section found\n");
+	case NVRAM_ACTIVE_NONE:
 		break;
 	}
 
@@ -150,11 +133,11 @@ exit:
 	if (r) {
 		free(pnvram);
 	}
-	if (data_a.buf) {
-		free(data_a.buf);
+	if (buf_a) {
+		free(buf_a);
 	}
-	if (data_b.buf) {
-		free(data_b.buf);
+	if (buf_b) {
+		free(buf_b);
 	}
 
 	return r;
@@ -174,35 +157,32 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 	}
 
 	struct nvram_header hdr;
-	hdr.counter = nvram->counter + 1;
+	enum nvram_active next = nvram_next_transaction(&nvram->trans, &hdr);
+	if (hdr.counter == UINT32_MAX) {
+		pr_err("counter == %u support not implemented\n", hdr.counter);
+		goto exit;
+	}
 	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
 	if (!bytes) {
 		pr_err("failed serializing nvram data\n");
 		goto exit;
 	}
 
-	enum nvram_section new_section = NVRAM_SECTION_UNKNOWN;
-	switch (nvram->section) {
-	case NVRAM_SECTION_A:
-		new_section = NVRAM_SECTION_B;
-		break;
-	default:
-		new_section = NVRAM_SECTION_A;
-		break;
-	}
-	pr_dbg("section %s: %s: write: %"PRIu32" b\n", nvram_section_str(new_section), nvram_interface_path(nvram->priv, new_section), size);
-	r = nvram_interface_write(nvram->priv, new_section, buf, size);
+	pr_dbg("section %s: %s: write: %"PRIu32" b\n", nvram_section_str(active_to_section(next)),
+			nvram_interface_path(nvram->priv, active_to_section(next)), size);
+	r = nvram_interface_write(nvram->priv, active_to_section(next), buf, size);
 	if (r) {
 		pr_err("section %s: %s: failed writing %"PRIu32" bytes [%d]: %s\n",
-				nvram_section_str(new_section), nvram_interface_path(nvram->priv, new_section), size, -r, strerror(-r));
+				nvram_section_str(active_to_section(next)), nvram_interface_path(nvram->priv, active_to_section(next)), size, -r, strerror(-r));
 		goto exit;
 	}
 
-	nvram->section = new_section;
-	nvram->counter = hdr.counter;
+	nvram->trans.active = next;
+	memcpy(next == NVRAM_ACTIVE_A ? &nvram->trans.section_a.hdr : &nvram->trans.section_b.hdr, &hdr, sizeof(nvram->trans.section_a.hdr));
+
 	pr_dbg("section %s: valid: true: counter: %"PRIu32": data_len: %"PRIu32"\n",
-			nvram_section_str(nvram->section), nvram->counter, size);
-	pr_dbg("section %s: %s: active\n", nvram_section_str(nvram->section), nvram_interface_path(nvram->priv, nvram->section));
+			nvram_section_str(next), hdr.counter, size);
+	pr_dbg("section %s: %s: active\n", nvram_section_str(next), nvram_interface_path(nvram->priv, active_to_section(next)));
 
 	r = 0;
 exit:
