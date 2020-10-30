@@ -6,34 +6,39 @@
 #include <errno.h>
 #include "nvram_interface.h"
 
-struct nvram_interface_priv {
-	char *a_path;
-	char *b_path;
+struct nvram_device {
+	char *path;
 };
 
-int nvram_interface_init(struct nvram_interface_priv** priv, const char* section_a, const char* section_b)
+int nvram_interface_init(struct nvram_device** dev, const char* section)
 {
-	struct nvram_interface_priv *pbuf = malloc(sizeof(struct nvram_interface_priv));
+	if (!section || *dev) {
+		return -EINVAL;
+	}
+
+	struct nvram_device *pbuf = malloc(sizeof(struct nvram_device));
 	if (!pbuf) {
 		return -ENOMEM;
 	}
-	pbuf->a_path = (char*) section_a;
-	pbuf->b_path = (char*) section_b;
+	pbuf->path = (char*) section;
 
-	*priv = pbuf;
+	*dev = pbuf;
 
 	return 0;
 }
 
-int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section_name section, size_t* size)
+void nvram_interface_destroy(struct nvram_device** dev)
 {
-	const char* path = nvram_interface_path(priv, section);
-	if (!path) {
-		return -EINVAL;
+	if (*dev) {
+		free(*dev);
+		*dev = NULL;
 	}
+}
 
+int nvram_interface_size(struct nvram_device* dev, size_t* size)
+{
 	struct stat sb;
-	if (stat(path, &sb)) {
+	if (stat(dev->path, &sb)) {
 		switch (errno) {
 		case ENOENT:
 			*size = 0;
@@ -47,23 +52,18 @@ int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section_n
 	return 0;
 }
 
-int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section_name section, uint8_t* buf, size_t size)
+int nvram_interface_read(struct nvram_device* dev, uint8_t* buf, size_t size)
 {
 	if (!buf) {
 		return -EINVAL;
 	}
 
-	const char* path = nvram_interface_path(priv, section);
-	if (!path) {
-		return -EINVAL;
-	}
-
-	int r = 0;
-	int fd = open(path, O_RDONLY);
+	int fd = open(dev->path, O_RDONLY);
 	if (fd < 0) {
 		return -errno;
 	}
 
+	int r = 0;
 	ssize_t bytes = read(fd, buf, size);
 	if (bytes < 0) {
 		r = -errno;
@@ -80,23 +80,18 @@ exit:
 	return r;
 }
 
-int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section_name section, const uint8_t* buf, size_t size)
+int nvram_interface_write(struct nvram_device* dev, const uint8_t* buf, size_t size)
 {
 	if (!buf) {
 		return -EINVAL;
 	}
 
-	const char* path = nvram_interface_path(priv, section);
-	if (!path) {
-		return -EINVAL;
-	}
-
-	int r = 0;
-	int fd = open(path, O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR);
+	int fd = open(dev->path, O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR);
 	if (fd < 0) {
 		return -errno;
 	}
 
+	int r = 0;
 	ssize_t bytes = write(fd, buf, size);
 	if (bytes < 0) {
 		r = -errno;
@@ -113,14 +108,7 @@ exit:
 	return r;
 }
 
-const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum nvram_section_name section)
+const char* nvram_interface_section(const struct nvram_device* dev)
 {
-	switch (section) {
-	case NVRAM_SECTION_A:
-		return priv->a_path;
-	case NVRAM_SECTION_B:
-		return priv->b_path;
-	default:
-		return NULL;
-	}
+	return dev->path;
 }

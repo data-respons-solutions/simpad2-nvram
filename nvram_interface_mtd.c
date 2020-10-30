@@ -26,9 +26,9 @@ struct nvram_mtd {
 	long long size;
 };
 
-struct nvram_interface_priv {
-	struct nvram_mtd a_dev;
-	struct nvram_mtd b_dev;
+struct nvram_device {
+	char* label;
+	struct nvram_mtd mtd;
 	char* gpio;
 };
 
@@ -121,24 +121,19 @@ static int init_nvram_mtd(struct nvram_mtd* nvram_mtd, const char* label)
 	return 0;
 }
 
-int nvram_interface_init(struct nvram_interface_priv** priv, const char* section_a, const char* section_b)
+int nvram_interface_init(struct nvram_device** dev, const char* section)
 {
 	int r = 0;
-	struct nvram_interface_priv *pbuf = malloc(sizeof(struct nvram_interface_priv));
+	struct nvram_device *pbuf = malloc(sizeof(struct nvram_device));
 	if (!pbuf) {
 		return -ENOMEM;
 	}
-	memset(pbuf, 0, sizeof(struct nvram_interface_priv));
+	memset(pbuf, 0, sizeof(struct nvram_device));
 
-	r = init_nvram_mtd(&pbuf->a_dev, section_a);
-	if (r) {
-		free(pbuf);
-		return r;
-	}
+	pbuf->label = (char*) section;
 
-	r = init_nvram_mtd(&pbuf->b_dev, section_b);
+	r = init_nvram_mtd(&pbuf->mtd, section);
 	if (r) {
-		free(pbuf->a_dev.path);
 		free(pbuf);
 		return r;
 	}
@@ -153,40 +148,37 @@ int nvram_interface_init(struct nvram_interface_priv** priv, const char* section
 		pr_dbg("%s: WP_GPIO: %s\n", __func__, pbuf->gpio);
 	}
 
-	*priv = pbuf;
+	*dev = pbuf;
 
 	return 0;
 }
 
-int nvram_interface_size(struct nvram_interface_priv* priv, enum nvram_section_name section, size_t* size)
+void nvram_interface_destroy(struct nvram_device** dev)
 {
-	switch (section) {
-	case NVRAM_SECTION_A:
-		*size = priv->a_dev.size;
-		break;
-	case NVRAM_SECTION_B:
-		*size = priv->b_dev.size;
-		break;
-	default:
-		return -EINVAL;
+	struct nvram_device *pdev = *dev;
+	if (pdev) {
+		if (pdev->mtd.path) {
+			free(pdev->mtd.path);
+		}
+		free(pdev);
+		*dev = NULL;
 	}
+}
 
+int nvram_interface_size(struct nvram_device* dev, size_t* size)
+{
+	*size = dev->mtd.size;
 	return 0;
 }
 
-int nvram_interface_read(struct nvram_interface_priv* priv, enum nvram_section_name section, uint8_t* buf, size_t size)
+int nvram_interface_read(struct nvram_device* dev, uint8_t* buf, size_t size)
 {
 	if (!buf) {
 		return -EINVAL;
 	}
 
-	const char* path = nvram_interface_path(priv, section);
-	if (!path) {
-		return -EINVAL;
-	}
-
 	int r = 0;
-	int fd = open(path, O_RDONLY);
+	int fd = open(dev->mtd.path, O_RDONLY);
 	if (fd < 0) {
 		return -errno;
 	}
@@ -241,43 +233,32 @@ static int set_gpio(const char* path, bool value)
 	return -errno;
 }
 
-int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section_name section, const uint8_t* buf, size_t size)
+int nvram_interface_write(struct nvram_device* dev, const uint8_t* buf, size_t size)
 {
 	if (!buf) {
 		return -EINVAL;
 	}
 
-	const char* path = nvram_interface_path(priv, section);
-	if (!path) {
-		return -EINVAL;
-	}
-
 	int r = 0;
-	int fd = open(path, O_WRONLY);
+	int fd = open(dev->mtd.path, O_WRONLY);
 	if (fd < 0) {
 		return -errno;
 	}
 
-	long long mtd_size = 0LL;
-	r = nvram_interface_size(priv, section, (size_t*) &mtd_size);
-	if (r) {
-		goto exit;
-	}
-
-	if (priv->gpio) {
-		r = set_gpio(priv->gpio, false);
+	if (dev->gpio) {
+		r = set_gpio(dev->gpio, false);
 		if (r) {
 			goto exit;
 		}
 	}
 
-	pr_dbg("%s: erasing\n", nvram_section_str(section));
-	r = erase_mtd(fd, mtd_size);
+	pr_dbg("%s: erasing\n", dev->mtd.path);
+	r = erase_mtd(fd, dev->mtd.size);
 	if (r) {
 		goto exit;
 	}
 
-	pr_dbg("%s: writing\n", nvram_section_str(section));
+	pr_dbg("%s: writing\n", dev->mtd.path);
 	ssize_t bytes = write(fd, buf, size);
 	if (bytes < 0) {
 		r = -errno;
@@ -292,22 +273,15 @@ int nvram_interface_write(struct nvram_interface_priv* priv, enum nvram_section_
 	r = 0;
 
 exit:
-	if (priv->gpio) {
-		set_gpio(priv->gpio, true);
+	if (dev->gpio) {
+		set_gpio(dev->gpio, true);
 	}
 
 	close(fd);
 	return r;
 }
 
-const char* nvram_interface_path(const struct nvram_interface_priv* priv, enum nvram_section_name section)
+const char* nvram_interface_section(const struct nvram_device* dev)
 {
-	switch (section) {
-	case NVRAM_SECTION_A:
-		return priv->a_dev.path;
-	case NVRAM_SECTION_B:
-		return priv->b_dev.path;
-	default:
-		return NULL;
-	}
+	return dev->label;
 }

@@ -3,7 +3,7 @@ CC ?= gcc
 INSTALL_PATH ?= /usr/sbin
 
 NVRAM_INTERFACE_TYPE ?= file
-OBJS = log.o nvram.o nvram_interface.o main.o libnvram/libnvram.a
+OBJS = log.o nvram.o main.o libnvram/libnvram.a
 
 NVRAM_SRC_VERSION := $(shell git describe --dirty --always)
 ifeq ($(NVRAM_INTERFACE_TYPE), file)
