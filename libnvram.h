@@ -164,23 +164,24 @@ void nvram_it_deref(const uint8_t* it, struct nvram_entry* entry);
  * The transaction API will iterate nvram_header->counter for each write
  * which indicates the last used section
  */
-
 enum nvram_state {
 	NVRAM_STATE_UNKNOWN         = 0,
 	NVRAM_STATE_HEADER_VERIFIED = 1 << 0,
-	NVRAM_STATE_DATA_VERIFIED   = 1 << 1,
+	NVRAM_STATE_HEADER_CORRUPT  = 1 << 1,
+	NVRAM_STATE_DATA_VERIFIED   = 1 << 2,
+	NVRAM_STATE_DATA_CORRUPT    = 1 << 3,
 	NVRAM_STATE_ALL_VERIFIED    = NVRAM_STATE_HEADER_VERIFIED | NVRAM_STATE_DATA_VERIFIED,
 };
 
 struct nvram_section {
 	struct nvram_header hdr;
-	enum nvram_state state;
+	enum nvram_state state;  // Current state of section
 };
 
 enum nvram_active {
 	NVRAM_ACTIVE_NONE = 0,
-	NVRAM_ACTIVE_A,
-	NVRAM_ACTIVE_B
+	NVRAM_ACTIVE_A    = 1 << 0,
+	NVRAM_ACTIVE_B    = 1 << 1,
 };
 
 struct nvram_transaction {
@@ -196,10 +197,29 @@ struct nvram_transaction {
 void nvram_init_transaction(struct nvram_transaction* trans, const uint8_t* data_a, uint32_t len_a, const uint8_t* data_b, uint32_t len_b);
 
 /*
- * Returns which section changes should be written to.
- * The nvram_header returned from this function should be used for next nvram_serialize call.
+ * Describes which nvram section next update should be written to.
+ * Will always contain either NVRAM_OPERATION_WRITE_A or NVRAM_OPERATION_WRITE_B.
+ * After performing write operation to above, if NVRAM_OPERATION_WRITE_OTHER is set,
+ * also the other nvram section should be written to.
  */
-enum nvram_active nvram_next_transaction(const struct nvram_transaction* trans, struct nvram_header* hdr);
+enum nvram_operation {
+	NVRAM_OPERATION_WRITE_A = 1 << 0,
+	NVRAM_OPERATION_WRITE_B = 1 << 1,
+	NVRAM_OPERATION_WRITE_OTHER = 1 << 2,
+};
+/*
+ * Returns which operations should be performed when commiting changes to nvram.
+ * The nvram_header returned from this function should be used for nvram_serialize call.
+ */
+enum nvram_operation nvram_next_transaction(const struct nvram_transaction* trans, struct nvram_header* hdr);
+
+/*
+ * Updates state of transaction. This function should be called after operations described by nvram_next_transaction
+ * have been performed.
+ * nvram_operation should be return value of nvram_next_transaction.
+ * nvram_header should be the returned one from nvram_serialize call.
+ */
+void nvram_update_transaction(struct nvram_transaction* trans,  enum nvram_operation op, const struct nvram_header* hdr);
 
 #ifdef __cplusplus
 }

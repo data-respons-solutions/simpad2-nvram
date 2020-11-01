@@ -386,22 +386,47 @@ static void validate_section(struct nvram_section* section, const uint8_t* data,
 	int r = nvram_validate_header(data, len, &section->hdr);
 	if (!r) {
 		section->state |= NVRAM_STATE_HEADER_VERIFIED;
-		if (len >= nvram_header_len()) {
-			r = nvram_validate_data(data + nvram_header_len(), len - nvram_header_len(), &section->hdr);
-			if (!r) {
-				section->state |= NVRAM_STATE_DATA_VERIFIED;
-			}
-		}
 	}
+	else {
+		section->state |= NVRAM_STATE_HEADER_CORRUPT;
+		return;
+	}
+
+	r = 1;
+	if (len >= nvram_header_len()) {
+		r = nvram_validate_data(data + nvram_header_len(), len - nvram_header_len(), &section->hdr);
+	}
+	if (!r) {
+		section->state |= NVRAM_STATE_DATA_VERIFIED;
+	}
+	else {
+		section->state |= NVRAM_STATE_DATA_CORRUPT;
+	}
+	return;
 }
 
 static enum nvram_active find_active(const struct nvram_section* section_a, const struct nvram_section* section_b)
 {
-	if (section_a->state == NVRAM_STATE_ALL_VERIFIED && (section_a->hdr.counter > section_b->hdr.counter)) {
+	const int is_verified_a = (section_a->state & NVRAM_STATE_ALL_VERIFIED) == NVRAM_STATE_ALL_VERIFIED;
+	const int is_verified_b = (section_b->state & NVRAM_STATE_ALL_VERIFIED) == NVRAM_STATE_ALL_VERIFIED;
+	if (is_verified_a && is_verified_b) {
+		if (section_a->hdr.counter == section_b->hdr.counter) {
+			return NVRAM_ACTIVE_A | NVRAM_ACTIVE_B;
+		}
+		else
+		if (section_a->hdr.counter > section_b->hdr.counter) {
+			return NVRAM_ACTIVE_A;
+		}
+		else {
+			return NVRAM_ACTIVE_B;
+		}
+	}
+	else
+	if (is_verified_a) {
 		return NVRAM_ACTIVE_A;
 	}
 	else
-	if (section_b->state == NVRAM_STATE_ALL_VERIFIED) {
+	if (is_verified_b) {
 		return NVRAM_ACTIVE_B;
 	}
 	else {
@@ -416,18 +441,39 @@ void nvram_init_transaction(struct nvram_transaction* trans, const uint8_t* data
 	trans->active = find_active(&trans->section_a, &trans->section_b);
 }
 
-enum nvram_active nvram_next_transaction(const struct nvram_transaction* trans, struct nvram_header* hdr)
+enum nvram_operation nvram_next_transaction(const struct nvram_transaction* trans, struct nvram_header* hdr)
 {
-	switch (trans->active) {
-		case NVRAM_ACTIVE_A:
-			hdr->counter = trans->section_a.hdr.counter + 1;
-			return NVRAM_ACTIVE_B;
-		case NVRAM_ACTIVE_B:
-			hdr->counter = trans->section_b.hdr.counter + 1;
-			return NVRAM_ACTIVE_A;
-		default:
-			hdr->counter = 1;
-			return NVRAM_ACTIVE_A;
+	enum nvram_operation op = NVRAM_OPERATION_WRITE_A;
+	if ((trans->active & NVRAM_ACTIVE_A) == NVRAM_ACTIVE_A) {
+		op = NVRAM_OPERATION_WRITE_B;
+		hdr->counter = trans->section_a.hdr.counter + 1;
 	}
+	else
+	if ((trans->active & NVRAM_ACTIVE_B) == NVRAM_ACTIVE_B) {
+		op = NVRAM_OPERATION_WRITE_A;
+		hdr->counter = trans->section_b.hdr.counter + 1;
+	}
+	else {
+		hdr->counter = 1;
+	}
+
+	if (hdr->counter == UINT32_MAX) {
+		op |= NVRAM_OPERATION_WRITE_OTHER;
+	}
+
+	return op;
 }
 
+void nvram_update_transaction(struct nvram_transaction* trans,  enum nvram_operation op, const struct nvram_header* hdr)
+{
+	const int is_write_other = (op & NVRAM_OPERATION_WRITE_OTHER) == NVRAM_OPERATION_WRITE_OTHER;
+	const int is_write_a = (op & NVRAM_OPERATION_WRITE_A) == NVRAM_OPERATION_WRITE_A || is_write_other;
+	const int is_write_b = (op & NVRAM_OPERATION_WRITE_B) == NVRAM_OPERATION_WRITE_B || is_write_other;
+	if (is_write_a) {
+		memcpy(&trans->section_a.hdr, hdr, sizeof(struct nvram_header));
+	}
+	if (is_write_b) {
+		memcpy(&trans->section_b.hdr, hdr, sizeof(struct nvram_header));
+	}
+	trans->active = find_active(&trans->section_a, &trans->section_b);
+}
