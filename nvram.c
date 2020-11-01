@@ -116,27 +116,19 @@ int nvram_init(struct nvram** nvram, struct nvram_list** list, const char* secti
 
 	nvram_init_transaction(&pnvram->trans, buf_a, size_a, buf_b, size_b);
 	pr_dbg("%s: active\n", nvram_active_str(pnvram->trans.active));
-
-	switch(pnvram->trans.active) {
-	case NVRAM_ACTIVE_A:
+	r = 0;
+	if ((pnvram->trans.active & NVRAM_ACTIVE_A) == NVRAM_ACTIVE_A) {
 		r = nvram_deserialize(list, buf_a + nvram_header_len(), size_a - nvram_header_len(), &pnvram->trans.section_a.hdr);
-		if (r) {
-			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
-			goto exit;
-		}
-		break;
-	case NVRAM_ACTIVE_B:
+	}
+	else
+	if ((pnvram->trans.active & NVRAM_ACTIVE_B) == NVRAM_ACTIVE_B) {
 		r = nvram_deserialize(list, buf_b + nvram_header_len(), size_b - nvram_header_len(), &pnvram->trans.section_b.hdr);
-		if (r) {
-			pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
-			goto exit;
-		}
-		break;
-	case NVRAM_ACTIVE_NONE:
-		break;
 	}
 
-	r = 0;
+	if (r) {
+		pr_err("failed deserializing data [%d]: %s\n", -r, strerror(-r));
+		goto exit;
+	}
 
 	*nvram = pnvram;
 
@@ -162,12 +154,21 @@ exit:
 	return r;
 }
 
+static int _write(struct nvram_device* dev, const uint8_t* buf, uint32_t size)
+{
+	pr_dbg("%s: write: %" PRIu32 " b\n", nvram_interface_section(dev), size);
+	int r = nvram_interface_write(dev, buf, size);
+	if (r) {
+		pr_err("%s: failed writing %" PRIu32 " b [%d]: %s\n", nvram_interface_section(dev), size, -r, strerror(-r));
+	}
+	return r;
+}
+
 int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 {
 	uint8_t *buf = NULL;
 	int r = 0;
 	uint32_t size = nvram_serialize_size(list);
-	int restart_counter = 0;
 
 	buf = (uint8_t*) malloc(size);
 	if (!buf) {
@@ -177,59 +178,32 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 	}
 
 	struct nvram_header hdr;
-	enum nvram_active next = nvram_next_transaction(&nvram->trans, &hdr);
-	if (hdr.counter == UINT32_MAX) {
-		hdr.counter = 1;
-		restart_counter = 1;
-	}
+	enum nvram_operation op = nvram_next_transaction(&nvram->trans, &hdr);
 	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
 	if (!bytes) {
 		pr_err("failed serializing nvram data\n");
 		goto exit;
 	}
 
-	// If we only have a single section, overwrite next
 	if (!nvram->dev_a || !nvram->dev_b) {
-		// counter restart operation not needed with a single section
-		restart_counter = 0;
-		if (nvram->dev_a) {
-			next = NVRAM_ACTIVE_A;
-		}
-		else {
-			next = NVRAM_ACTIVE_B;
-		}
+		// Transactional write disabled
+		r = _write(nvram->dev_a ? nvram->dev_a : nvram->dev_b, buf, size);
 	}
-
-	switch (next) {
-	case NVRAM_ACTIVE_A:
-		r = nvram_interface_write(nvram->dev_a, buf, size);
-		break;
-	case NVRAM_ACTIVE_B:
-		r = nvram_interface_write(nvram->dev_b, buf, size);
-		break;
-	case NVRAM_ACTIVE_NONE:
-		r = -EFAULT;
-		pr_err("next section undefined -- aborting\n");
-		goto exit;
+	else {
+		const int is_write_a = (op & NVRAM_OPERATION_WRITE_A) == NVRAM_OPERATION_WRITE_A;
+		const int is_write_other = (op & NVRAM_OPERATION_WRITE_OTHER) == NVRAM_OPERATION_WRITE_OTHER;
+		// first write
+		r = _write(is_write_a ? nvram->dev_a : nvram->dev_b, buf, size);
+		if (!r && is_write_other) {
+			// second write, if requested
+			r = _write(is_write_a ? nvram->dev_b : nvram->dev_a, buf, size);
+		}
 	}
 	if (r) {
-		pr_err("%s: failed writing %" PRIu32 " b [%d]: %s\n", nvram_active_str(next), size, -r, strerror(-r));
 		goto exit;
 	}
-	pr_dbg("%s: write: %" PRIu32 " b\n", nvram_active_str(next), size);
 
-	if (restart_counter) {
-		pr_dbg("header counter == %u -- counter reset needed\n", UINT32_MAX);
-		r = nvram_interface_write(next == NVRAM_ACTIVE_A ? nvram->dev_b : nvram->dev_a, buf, size);
-		if (r) {
-			pr_err("%s: failed writing %" PRIu32 " b [%d]: %s\n",
-					nvram_active_str(next == NVRAM_ACTIVE_A ? NVRAM_ACTIVE_B : NVRAM_ACTIVE_A), size, -r, strerror(-r));
-			goto exit;
-		}
-	}
-
-	nvram->trans.active = next;
-	memcpy(next == NVRAM_ACTIVE_A ? &nvram->trans.section_a.hdr : &nvram->trans.section_b.hdr, &hdr, sizeof(nvram->trans.section_a.hdr));
+	nvram_update_transaction(&nvram->trans, op, &hdr);
 
 	pr_dbg("%s: active\n", nvram_active_str(nvram->trans.active));
 
