@@ -36,4 +36,6 @@ clean:
 	rm -f libnvram-test
 	rm -f libnvram-list-test.o
 	rm -f libnvram-list-test
-	
+	rm -f libnvram-trans-test.o
+	rm -f libnvram-trans-test
+
