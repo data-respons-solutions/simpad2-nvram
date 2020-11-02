@@ -473,9 +473,11 @@ void nvram_update_transaction(struct nvram_transaction* trans,  enum nvram_opera
 	const int is_write_b = (op & NVRAM_OPERATION_WRITE_B) == NVRAM_OPERATION_WRITE_B || is_write_other;
 	if (is_write_a) {
 		memcpy(&trans->section_a.hdr, hdr, sizeof(struct nvram_header));
+		trans->section_a.state = NVRAM_STATE_ALL_VERIFIED;
 	}
 	if (is_write_b) {
 		memcpy(&trans->section_b.hdr, hdr, sizeof(struct nvram_header));
+		trans->section_b.state = NVRAM_STATE_ALL_VERIFIED;
 	}
 	trans->active = find_active(&trans->section_a, &trans->section_b);
 }
