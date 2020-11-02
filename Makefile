@@ -17,12 +17,15 @@ libnvram-test: libnvram-test.o libnvram.a
 	
 libnvram-list-test: libnvram-list-test.o libnvram.a
 	$(CC) -o $@ $^ $(LDFLAGS)
+	
+libnvram-trans-test: libnvram-trans-test.o libnvram.a
+	$(CC) -o $@ $^ $(LDFLAGS)
    
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
-test: libnvram-test libnvram-list-test
+test: libnvram-test libnvram-list-test libnvram-trans-test
 
 .PHONY: clean
 clean:
