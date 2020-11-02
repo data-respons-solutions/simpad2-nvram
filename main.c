@@ -6,6 +6,8 @@
 #include <sys/file.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <inttypes.h>
+#include <limits.h>
 #include "log.h"
 #include "nvram.h"
 #include "libnvram/libnvram.h"
@@ -178,6 +180,184 @@ static void print_usage(const char* progname)
 	printf("\n");
 }
 
+enum print_options {
+	PRINT_VALUE,
+	PRINT_KEY_AND_VALUE,
+};
+
+static size_t calc_size(const uint32_t len, int is_str)
+{
+	if (is_str) {
+		// null-terminator ignored
+		return len - 1;
+	}
+	else {
+		// prefix "0x" + every byte represtended by 2 char in hex
+		return 2 + len * 2;
+	}
+}
+
+// return bytes written, negative errno for error
+static int append_hex(char* str, size_t size, uint8_t* data, uint32_t len)
+{
+	int bytes = 0;
+	int r = snprintf(str, size, "0x");
+	if (r < 0) {
+		return -errno;
+	}
+	else
+	if (r != 2) {
+		return -EFAULT;
+	}
+	bytes += r;
+	for (uint32_t i = 0; i < len; ++i) {
+		r = snprintf(str + bytes, size - bytes, "%02" PRIx8 "", data[i]);
+		if (r < 0) {
+			return -errno;
+		}
+		else
+		if (r != 2) {
+			return -EFAULT;
+		}
+		bytes += r;
+	}
+
+	return bytes;
+}
+
+static int print_entry(const struct nvram_entry* entry, enum print_options opts)
+{
+	if (entry->key_len > INT_MAX || entry->value_len > INT_MAX) {
+		return -EINVAL;
+	}
+	size_t size = 2; // min size with null-termination and newline
+
+	const int is_key_str = entry->key[entry->key_len - 1] =='\0';
+	if (opts == PRINT_KEY_AND_VALUE) {
+		size += 1; // separate key and value with =
+		size += calc_size(entry->key_len, is_key_str);
+	}
+
+	const int is_value_str = entry->value[entry->value_len - 1] =='\0';
+	size += calc_size(entry->value_len, is_value_str);
+
+	char* str = malloc(size);
+	if (!str) {
+		return -ENOMEM;
+	}
+
+	int r = 0;
+	size_t pos = 0;
+	if (opts == PRINT_KEY_AND_VALUE) {
+		if (is_key_str) {
+			r = snprintf(str + pos, size - pos, "%s=", (char*) entry->key);
+			if (r != (int) entry->key_len) {
+				r = -errno;
+				goto exit;
+			}
+			pos += r;
+		}
+		else {
+			r = append_hex(str + pos, size - pos, entry->key, entry->key_len);
+			if (r < 0) {
+				goto exit;
+			}
+			pos += r;
+			r = snprintf(str + pos, size - pos, "=");
+			if (r != 1) {
+				r = -errno;
+				goto exit;
+			}
+			pos += r;
+		}
+	}
+
+	if (is_value_str) {
+		r = snprintf(str + pos, size - pos, "%s\n", (char*) entry->value);
+		if (r != (int) entry->value_len) {
+			r = -errno;
+			goto exit;
+		}
+		pos += r;
+	}
+	else {
+		r = append_hex(str + pos, size - pos, entry->value, entry->value_len);
+		if (r < 0) {
+			goto exit;
+		}
+		pos += r;
+		r = snprintf(str + pos, size - pos, "\n");
+		if (r != 1) {
+			r = -errno;
+			goto exit;
+		}
+		pos += r;
+	}
+
+	printf("%s", str);
+	r = 0;
+
+exit:
+	free(str);
+	return r;
+}
+
+
+// return 0 for OK or negative errno for error
+static int print_list_entry(const char* list_name, const struct nvram_list* list, const char* key)
+{
+	pr_dbg("getting key from %s: %s\n", list_name, key);
+	struct nvram_entry *entry = nvram_list_get(list, (uint8_t*) key, strlen(key) + 1);
+	if (!entry) {
+		return -ENOENT;
+	}
+
+	return print_entry(entry, PRINT_VALUE);
+}
+
+static void print_list(const char* list_name, const struct nvram_list* list)
+{
+	pr_dbg("listing %s\n", list_name);
+	for (struct nvram_list *cur = (struct nvram_list*) list; cur; cur = cur->next) {
+		print_entry(cur->entry, PRINT_KEY_AND_VALUE);
+	}
+}
+
+// return 0 for equal
+static int keycmp(const uint8_t* key1, uint32_t key1_len, const uint8_t* key2, uint32_t key2_len)
+{
+	if (key1_len == key2_len) {
+		return memcmp(key1, key2, key1_len);
+	}
+	return 1;
+}
+
+// return 0 if already exists, 1 if added, negate errno for error
+static int add_list_entry(const char* list_name, struct nvram_list** list, const char* key, const char* value)
+{
+	const size_t key_len = strlen(key) + 1;
+	const size_t value_len = strlen(value) + 1;
+
+	pr_dbg("setting: %s: %s=%s\n", list_name, key, value);
+	struct nvram_entry *entry = nvram_list_get(*list, (uint8_t*) key, key_len);
+	if (entry && !keycmp(entry->value, entry->value_len, (uint8_t*) value, value_len)) {
+		return 0;
+	}
+	struct nvram_entry new;
+	new.key = (uint8_t*) key;
+	new.key_len = key_len;
+	new.value = (uint8_t*) value;
+	new.value_len = value_len;
+
+	int r = nvram_list_set(list, &new);
+	if (r) {
+		pr_err("failed setting to %s list [%d]: %s\n", list_name, -r, strerror(-r));
+		return r;
+	}
+
+	return 1;
+}
+
 int main(int argc, char** argv)
 {
 
@@ -284,8 +464,6 @@ int main(int argc, char** argv)
 	pr_dbg("NVRAM_SYSTEM_A: %s\n", nvram_system_a);
 	pr_dbg("NVRAM_SYSTEM_B: %s\n", nvram_system_b);
 
-	struct nvram_entry *entry = NULL;
-
 	r = nvram_init(&nvram_system, &list_system, nvram_system_a, nvram_system_b);
 	if (r) {
 		goto exit;
@@ -303,50 +481,34 @@ int main(int argc, char** argv)
 
 	switch (opts.op) {
 	case OP_LIST:
-		pr_dbg("listing system\n");
-		for (struct nvram_list *cur = list_system; cur; cur = cur->next) {
-			printf("%s=%s\n", (char*) cur->entry->key, (char*) cur->entry->value);
-		}
-		if(!opts.system_mode) {
-			pr_dbg("listing user\n");
-			for (struct nvram_list *cur = list_user; cur; cur = cur->next) {
-				printf("%s=%s\n", (char*) cur->entry->key, (char*) cur->entry->value);
-			}
+		print_list("system", list_system);
+		if (!opts.system_mode) {
+			print_list("user", list_user);
 		}
 		break;
 	case OP_GET:
-		pr_dbg("getting key from system: %s\n", opts.key);
-		entry = nvram_list_get(list_system, (uint8_t*) opts.key, strlen(opts.key) + 1) ;
-		if (!entry && !opts.system_mode) {
-			pr_dbg("getting key from user: %s\n", opts.key);
-			entry = nvram_list_get(list_user, (uint8_t*) opts.key, strlen(opts.key) + 1);
+		r = print_list_entry("system", list_system, opts.key);
+		if (r && !opts.system_mode) {
+			r = print_list_entry("user", list_user, opts.key);
 		}
-		if (!entry) {
+		if (r) {
 			pr_dbg("key not found: %s\n", opts.key);
 			r = -ENOENT;
 			goto exit;
 		}
-		printf("%s\n", (char*) entry->value);
 		break;
 	case OP_SET:
-		pr_dbg("setting %s: %s=%s\n", opts.system_mode ? "system" : "user", opts.key, opts.val);
-		entry = nvram_list_get(opts.system_mode ? list_system : list_user, (uint8_t*) opts.key, strlen(opts.key) + 1);
-		if (!entry || strcmp((char*) entry->value, opts.val)) {
-			struct nvram_entry new;
-			new.key = (uint8_t*) opts.key;
-			new.key_len = strlen(opts.key) + 1;
-			new.value = (uint8_t*) opts.val;
-			new.value_len = strlen(opts.val) + 1;
-			r = nvram_list_set(opts.system_mode ? &list_system : &list_user, &new);
-			if (r) {
-				pr_err("failed setting to list [%d]: %s\n", -r, strerror(-r));
-				goto exit;
-			}
-
+		r = add_list_entry(opts.system_mode ? "system" : "user", opts.system_mode ? &list_system : &list_user, opts.key, opts.val);
+		switch (r) {
+		case 0:
+			break;
+		case 1:
 			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? list_system : list_user);
 			if (r) {
 				goto exit;
 			}
+		default:
+			goto exit;
 		}
 		break;
 	case OP_DEL:
