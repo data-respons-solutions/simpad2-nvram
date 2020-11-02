@@ -454,10 +454,12 @@ enum nvram_operation nvram_next_transaction(const struct nvram_transaction* tran
 		hdr->counter = trans->section_b.hdr.counter + 1;
 	}
 	else {
+		op = NVRAM_OPERATION_WRITE_A;
 		hdr->counter = 1;
 	}
 
 	if (hdr->counter == UINT32_MAX) {
+		hdr->counter = 1;
 		op |= NVRAM_OPERATION_COUNTER_RESET;
 	}
 
