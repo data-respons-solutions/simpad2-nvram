@@ -162,7 +162,9 @@ void nvram_it_deref(const uint8_t* it, struct nvram_entry* entry);
  * Transactional writes are a typical use case. We provide helper functions.
  *
  * The transaction API will iterate nvram_header->counter for each write
- * which indicates the last used section
+ * which indicates the last used section.
+ * When nvram_header->counter == UINT32_MAX a counter reset is performed
+ * requiring a write to both sections.
  */
 enum nvram_state {
 	NVRAM_STATE_UNKNOWN         = 0,
@@ -175,7 +177,7 @@ enum nvram_state {
 
 struct nvram_section {
 	struct nvram_header hdr;
-	enum nvram_state state;  // Current state of section
+	enum nvram_state state;  // Current state of section flag
 };
 
 enum nvram_active {
@@ -187,7 +189,7 @@ enum nvram_active {
 struct nvram_transaction {
 	struct nvram_section section_a;
 	struct nvram_section section_b;
-	enum nvram_active active;
+	enum nvram_active active; // enum flag
 };
 
 /*
@@ -199,14 +201,15 @@ void nvram_init_transaction(struct nvram_transaction* trans, const uint8_t* data
 /*
  * Describes which nvram section next update should be written to.
  * Will always contain either NVRAM_OPERATION_WRITE_A or NVRAM_OPERATION_WRITE_B.
- * After performing write operation to above, if NVRAM_OPERATION_WRITE_OTHER is set,
- * also the other nvram section should be written to.
+ * After performing write operation to above, if NVRAM_OPERATION_COUNTER_RESET is set,
+ * also the second nvram section should be written to.
  */
 enum nvram_operation {
 	NVRAM_OPERATION_WRITE_A = 1 << 0,
 	NVRAM_OPERATION_WRITE_B = 1 << 1,
-	NVRAM_OPERATION_WRITE_OTHER = 1 << 2,
+	NVRAM_OPERATION_COUNTER_RESET = 1 << 2,
 };
+
 /*
  * Returns which operations should be performed when commiting changes to nvram.
  * The nvram_header returned from this function should be used for nvram_serialize call.

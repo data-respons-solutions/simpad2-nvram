@@ -458,7 +458,7 @@ enum nvram_operation nvram_next_transaction(const struct nvram_transaction* tran
 	}
 
 	if (hdr->counter == UINT32_MAX) {
-		op |= NVRAM_OPERATION_WRITE_OTHER;
+		op |= NVRAM_OPERATION_COUNTER_RESET;
 	}
 
 	return op;
@@ -466,7 +466,7 @@ enum nvram_operation nvram_next_transaction(const struct nvram_transaction* tran
 
 void nvram_update_transaction(struct nvram_transaction* trans,  enum nvram_operation op, const struct nvram_header* hdr)
 {
-	const int is_write_other = (op & NVRAM_OPERATION_WRITE_OTHER) == NVRAM_OPERATION_WRITE_OTHER;
+	const int is_write_other = (op & NVRAM_OPERATION_COUNTER_RESET) == NVRAM_OPERATION_COUNTER_RESET;
 	const int is_write_a = (op & NVRAM_OPERATION_WRITE_A) == NVRAM_OPERATION_WRITE_A || is_write_other;
 	const int is_write_b = (op & NVRAM_OPERATION_WRITE_B) == NVRAM_OPERATION_WRITE_B || is_write_other;
 	if (is_write_a) {
