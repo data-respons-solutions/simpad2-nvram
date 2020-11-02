@@ -191,10 +191,10 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 	}
 	else {
 		const int is_write_a = (op & NVRAM_OPERATION_WRITE_A) == NVRAM_OPERATION_WRITE_A;
-		const int is_write_other = (op & NVRAM_OPERATION_WRITE_OTHER) == NVRAM_OPERATION_WRITE_OTHER;
+		const int is_counter_reset = (op & NVRAM_OPERATION_COUNTER_RESET) == NVRAM_OPERATION_COUNTER_RESET;
 		// first write
 		r = _write(is_write_a ? nvram->dev_a : nvram->dev_b, buf, size);
-		if (!r && is_write_other) {
+		if (!r && is_counter_reset) {
 			// second write, if requested
 			r = _write(is_write_a ? nvram->dev_b : nvram->dev_a, buf, size);
 		}
