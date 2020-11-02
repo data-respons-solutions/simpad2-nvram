@@ -285,5 +285,52 @@ class test_mixed_delete(test_mixed_base):
         d = self.nvram_list()
         self.assertEqual(d, {key1: val1})
         
+class test_single_section(test_user_base):
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.dir = self.tmpdir.name
+        self.env = {
+                'NVRAM_SYSTEM_A': f'{self.dir}/system_a',
+                'NVRAM_SYSTEM_B': f'{self.dir}/system_b',
+                'NVRAM_USER_A': '',
+                'NVRAM_USER_B': '',
+            }
+        self.sys = False
+        
+    def tearDown(self):
+        self.tmpdir.cleanup()
+        
+    def test_single_a(self):
+        self.env['NVRAM_USER_A'] = f'{self.dir}/user_a'
+        attributes = {}
+        for i in range(10):
+            key = f'key{i}'
+            val = f'val{i}'
+            attributes[key] = val
+            self.nvram_set(key, val)
+        
+        for key, value in attributes.items():
+            read = self.nvram_get(key)
+            self.assertEqual(read, value)
+            
+        self.assertTrue(os.path.isfile(f'{self.dir}/user_a'))
+        self.assertFalse(os.path.isfile(f'{self.dir}/user_b'))
+            
+    def test_single_b(self):
+        self.env['NVRAM_USER_B'] = f'{self.dir}/user_b'
+        attributes = {}
+        for i in range(10):
+            key = f'key{i}'
+            val = f'val{i}'
+            attributes[key] = val
+            self.nvram_set(key, val)
+        
+        for key, value in attributes.items():
+            read = self.nvram_get(key)
+            self.assertEqual(read, value)
+            
+        self.assertTrue(os.path.isfile(f'{self.dir}/user_b'))
+        self.assertFalse(os.path.isfile(f'{self.dir}/user_a'))
+
 if __name__ == '__main__':
     unittest.main()
