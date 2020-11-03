@@ -98,7 +98,7 @@ struct nvram_header {
  * Returns length of serialized nvram header.
  * Useful if first validating header before reading data.
  */
-uint32_t nvram_header_len();
+uint32_t nvram_header_len(void);
 
 /*
  * Validate and return header from data buffer

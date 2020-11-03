@@ -184,7 +184,7 @@ static uint32_t u32tole(uint32_t host)
 #define NVRAM_ENTRY_DATA_OFFSET 8
 #define NVRAM_ENTRY_HEADER_SIZE sizeof(uint32_t) * 2
 
-uint32_t nvram_header_len()
+uint32_t nvram_header_len(void)
 {
 	return NVRAM_HEADER_SIZE;
 }
