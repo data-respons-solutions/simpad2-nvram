@@ -27,9 +27,7 @@ ifeq ($(NVRAM_INTERFACE_TYPE), efi)
 OBJS += nvram_interface_efi.o
 LDFLAGS += -le2p
 NVRAM_SYSTEM_A ?= /sys/firmware/efi/efivars/604dafe4-587a-47f6-8604-3d33eb83da3d-system
-NVRAM_SYSTEM_B = -
 NVRAM_USER_A ?= /sys/firmware/efi/efivars/604dafe4-587a-47f6-8604-3d33eb83da3d-user
-NVRAM_USER_B = -
 endif
 
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror -pedantic
