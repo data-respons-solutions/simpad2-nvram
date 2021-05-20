@@ -26,6 +26,11 @@ libnvram-trans-test: libnvram-trans-test.o libnvram.a
 
 .PHONY: test
 test: libnvram-test libnvram-list-test libnvram-trans-test
+	for test in $^; do \
+		if ! ./$${test}; then \
+			exit 1; \
+		fi \
+	done
 
 .PHONY: clean
 clean:
