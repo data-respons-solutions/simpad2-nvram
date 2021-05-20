@@ -443,7 +443,6 @@ static void validate_section(struct libnvram_section* section, const uint8_t* da
 	else {
 		section->state |= LIBNVRAM_STATE_DATA_CORRUPT;
 	}
-	return;
 }
 
 static enum libnvram_active find_active(const struct libnvram_section* section_a, const struct libnvram_section* section_b)
@@ -454,25 +453,18 @@ static enum libnvram_active find_active(const struct libnvram_section* section_a
 		if (section_a->hdr.user == section_b->hdr.user) {
 			return LIBNVRAM_ACTIVE_A | LIBNVRAM_ACTIVE_B;
 		}
-		else
 		if (section_a->hdr.user > section_b->hdr.user) {
 			return LIBNVRAM_ACTIVE_A;
 		}
-		else {
-			return LIBNVRAM_ACTIVE_B;
-		}
+		return LIBNVRAM_ACTIVE_B;
 	}
-	else
 	if (is_verified_a) {
 		return LIBNVRAM_ACTIVE_A;
 	}
-	else
 	if (is_verified_b) {
 		return LIBNVRAM_ACTIVE_B;
 	}
-	else {
-		return LIBNVRAM_ACTIVE_NONE;
-	}
+	return LIBNVRAM_ACTIVE_NONE;
 }
 
 void libnvram_init_transaction(struct libnvram_transaction* trans, const uint8_t* data_a, uint32_t len_a, const uint8_t* data_b, uint32_t len_b)

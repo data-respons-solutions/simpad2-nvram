@@ -40,11 +40,11 @@ static int test_libnvram_init_transaction()
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_a.hdr, &hdr1, sizeof(hdr1))) {
+	if (memcmp(&trans.section_a.hdr, &hdr1, sizeof(hdr1)) != 0) {
 		printf("header1 wrong\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr2, sizeof(hdr2))) {
+	if (memcmp(&trans.section_b.hdr, &hdr2, sizeof(hdr2)) != 0) {
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
@@ -63,11 +63,11 @@ static int test_libnvram_init_transaction()
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_a.hdr, &hdr2, sizeof(hdr2))) {
+	if (memcmp(&trans.section_a.hdr, &hdr2, sizeof(hdr2)) != 0) {
 		printf("header1 wrong\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr1, sizeof(hdr1))) {
+	if (memcmp(&trans.section_b.hdr, &hdr1, sizeof(hdr1)) != 0) {
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
@@ -125,7 +125,7 @@ static int test_libnvram_init_transaction_corrupt_header()
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr, sizeof(hdr))) {
+	if (memcmp(&trans.section_b.hdr, &hdr, sizeof(hdr)) != 0) {
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
@@ -144,7 +144,7 @@ static int test_libnvram_init_transaction_corrupt_header()
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_a.hdr, &hdr, sizeof(hdr))) {
+	if (memcmp(&trans.section_a.hdr, &hdr, sizeof(hdr)) != 0) {
 		printf("header1 wrong\n");
 		goto error_exit;
 	}
@@ -195,11 +195,11 @@ static int test_libnvram_init_transaction_corrupt_data()
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_a.hdr, &hdr1, sizeof(hdr1))) {
+	if (memcmp(&trans.section_a.hdr, &hdr1, sizeof(hdr1)) != 0) {
 		printf("header1 wrong\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr2, sizeof(hdr2))) {
+	if (memcmp(&trans.section_b.hdr, &hdr2, sizeof(hdr2)) != 0) {
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
@@ -218,11 +218,11 @@ static int test_libnvram_init_transaction_corrupt_data()
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_a.hdr, &hdr2, sizeof(hdr2))) {
+	if (memcmp(&trans.section_a.hdr, &hdr2, sizeof(hdr2)) != 0) {
 		printf("header1 wrong\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr1, sizeof(hdr1))) {
+	if (memcmp(&trans.section_b.hdr, &hdr1, sizeof(hdr1)) != 0) {
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
@@ -363,11 +363,11 @@ static int test_libnvram_update_transaction()
 	memcpy(&trans.section_b.hdr, &hdr2, sizeof(hdr2));
 	trans.active = LIBNVRAM_ACTIVE_A;
 	libnvram_update_transaction(&trans, LIBNVRAM_OPERATION_WRITE_B, &hdr3);
-	if (memcmp(&trans.section_a.hdr, &hdr1, sizeof(hdr1))) {
+	if (memcmp(&trans.section_a.hdr, &hdr1, sizeof(hdr1)) != 0) {
 		printf("section_a hdr wrong\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr3, sizeof(hdr3))) {
+	if (memcmp(&trans.section_b.hdr, &hdr3, sizeof(hdr3)) != 0) {
 		printf("section_b hdr wrong\n");
 		goto error_exit;
 	}
@@ -381,11 +381,11 @@ static int test_libnvram_update_transaction()
 	memcpy(&trans.section_b.hdr, &hdr1, sizeof(hdr1));
 	trans.active = LIBNVRAM_ACTIVE_B;
 	libnvram_update_transaction(&trans, LIBNVRAM_OPERATION_WRITE_A, &hdr3);
-	if (memcmp(&trans.section_a.hdr, &hdr3, sizeof(hdr3))) {
+	if (memcmp(&trans.section_a.hdr, &hdr3, sizeof(hdr3)) != 0) {
 		printf("section_a hdr wrong\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr1, sizeof(hdr1))) {
+	if (memcmp(&trans.section_b.hdr, &hdr1, sizeof(hdr1)) != 0) {
 		printf("section_b hdr wrong\n");
 		goto error_exit;
 	}
@@ -399,11 +399,11 @@ static int test_libnvram_update_transaction()
 	memcpy(&trans.section_b.hdr, &hdr2, sizeof(hdr2));
 	trans.active = LIBNVRAM_ACTIVE_A;
 	libnvram_update_transaction(&trans, LIBNVRAM_OPERATION_WRITE_B | LIBNVRAM_OPERATION_COUNTER_RESET, &hdr3);
-	if (memcmp(&trans.section_a.hdr, &hdr3, sizeof(hdr3))) {
+	if (memcmp(&trans.section_a.hdr, &hdr3, sizeof(hdr3)) != 0) {
 		printf("section_a hdr wrong\n");
 		goto error_exit;
 	}
-	if (memcmp(&trans.section_b.hdr, &hdr3, sizeof(hdr3))) {
+	if (memcmp(&trans.section_b.hdr, &hdr3, sizeof(hdr3)) != 0) {
 		printf("section_b hdr wrong\n");
 		goto error_exit;
 	}

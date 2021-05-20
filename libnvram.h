@@ -172,9 +172,9 @@ void libnvram_it_deref(const uint8_t* it, struct libnvram_entry* entry);
 /*
  * Transactional writes are a typical use case. We provide helper functions.
  *
- * The transaction API will iterate libnvram_header->counter for each write
- * which indicates the last used section.
- * When libnvram_header->counter == UINT32_MAX a counter reset is performed
+ * The transaction API will iterate libnvram_header->user as a counter for
+ * each write which indicates the last used section.
+ * When libnvram_header->user == UINT32_MAX a counter reset is performed
  * requiring a write to both sections.
  */
 enum libnvram_state {

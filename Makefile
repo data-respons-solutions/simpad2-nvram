@@ -25,6 +25,8 @@ test-crc32: test-crc32.o crc32.o test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
    
 .c.o:
+	clang-tidy $< -header-filter=.* \
+		-checks=-*,clang-analyzer-*,bugprone-*,cppcoreguidelines-*,portability-*,readability-* -- $<
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: test

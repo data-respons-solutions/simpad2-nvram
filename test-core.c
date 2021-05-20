@@ -469,7 +469,7 @@ static int test_libnvram_serialize()
 		goto error_exit;
 	}
 
-	if (memcmp(test_section, buf, size)) {
+	if (memcmp(test_section, buf, size) != 0) {
 		printf("buf != test_section\n");
 		goto error_exit;
 	}
@@ -525,7 +525,7 @@ static int test_libnvram_serialize_empty_data()
 		goto error_exit;
 	}
 
-	if (memcmp(test_section, buf, size)) {
+	if (memcmp(test_section, buf, size) != 0) {
 		printf("buf != test_section\n");
 		goto error_exit;
 	}
