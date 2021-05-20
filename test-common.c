@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include "libnvram.h"
+#include "crc32.h"
 #include "test-common.h"
 
 // return 0 for equal
@@ -30,6 +31,23 @@ void fill_entry(struct libnvram_entry* entry, const char* key, const char* value
 	entry->value = (uint8_t*) value;
 	entry->value_len = strlen(value);
 }
+
+struct libnvram_header make_header(uint32_t user, uint8_t type, uint32_t len, uint32_t crc32)
+{
+	struct libnvram_header hdr;
+	hdr.magic = 0xb32c41b4;
+	hdr.user = user;
+	hdr.type = type;
+	memset(hdr.reserved, 0, 3);
+	hdr.len = len;
+	hdr.crc32 = crc32;
+	hdr.hdr_crc32 = calc_crc32((uint8_t*)&hdr, sizeof(hdr) - 4);
+	return hdr;
+}
+
+uint32_t len;
+uint32_t crc32;
+uint32_t hdr_crc32;
 
 int main(int argc, char** argv)
 {
