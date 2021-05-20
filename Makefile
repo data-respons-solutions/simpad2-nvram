@@ -12,16 +12,16 @@ all: libnvram.a
 libnvram.a: crc32.o libnvram.o 
 	$(AR) rcs $@ $^
 
-libnvram-test: libnvram-test.o libnvram.a
+libnvram-test: libnvram-test.o libnvram.a test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-libnvram-list-test: libnvram-list-test.o libnvram.a
+libnvram-list-test: libnvram-list-test.o libnvram.a test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-libnvram-trans-test: libnvram-trans-test.o libnvram.a
+libnvram-trans-test: libnvram-trans-test.o libnvram.a test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-libnvram-crc32-test: libnvram-crc32-test.o crc32.o
+libnvram-crc32-test: libnvram-crc32-test.o crc32.o test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
    
 .c.o:

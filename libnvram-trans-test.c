@@ -3,8 +3,8 @@
 #include <string.h>
 #include <errno.h>
 #include <inttypes.h>
-
 #include "libnvram.h"
+#include "test-common.h"
 
 static int test_nvram_init_transaction()
 {
@@ -468,13 +468,6 @@ error_exit:
 	return 1;
 }
 
-struct test {
-	char* name;
-	int (*func)(void);
-};
-
-#define ADD_TEST(NAME) {#NAME, &NAME}
-
 struct test test_array[] = {
 		ADD_TEST(test_nvram_init_transaction),
 		ADD_TEST(test_nvram_init_transaction_corrupt_header),
@@ -486,22 +479,3 @@ struct test test_array[] = {
 		{NULL, NULL},
 };
 
-int main(int argc, char** argv)
-{
-	(void) argc;
-	(void) argv;
-
-	int errors = 0;
-
-	for (int i = 0; test_array[i].name; ++i) {
-		int r = (*test_array[i].func)();
-		if (r) {
-			errors++;
-		}
-		printf("%s: %s\n", test_array[i].name, r ? "FAIL" : "PASS");
-	}
-
-	printf("Result: %s\n", errors ? "FAIL" : "PASS");
-
-	return errors;
-}

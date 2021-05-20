@@ -3,8 +3,8 @@
 #include <string.h>
 #include <errno.h>
 #include <inttypes.h>
-
 #include "crc32.h"
+#include "test-common.h"
 
 static int test_crc32_1(void)
 {
@@ -73,13 +73,6 @@ static int test_crc32_data_zero(void)
 	return 0;
 }
 
-struct test {
-	char* name;
-	int (*func)(void);
-};
-
-#define ADD_TEST(NAME) {#NAME, &NAME}
-
 struct test test_array[] = {
 		ADD_TEST(test_crc32_1),
 		ADD_TEST(test_crc32_2),
@@ -87,23 +80,3 @@ struct test test_array[] = {
 		ADD_TEST(test_crc32_data_zero),
 		{NULL, NULL},
 };
-
-int main(int argc, char** argv)
-{
-	(void) argc;
-	(void) argv;
-
-	int errors = 0;
-
-	for (int i = 0; test_array[i].name; ++i) {
-		int r = (*test_array[i].func)();
-		if (r) {
-			errors++;
-		}
-		printf("%s: %s\n", test_array[i].name, r ? "FAIL" : "PASS");
-	}
-
-	printf("Result: %s\n", errors ? "FAIL" : "PASS");
-
-	return errors;
-}

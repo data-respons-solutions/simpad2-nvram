@@ -5,24 +5,7 @@
 #include <inttypes.h>
 
 #include "libnvram.h"
-
-// return 0 for equal
-static int keycmp(const uint8_t* key1, uint32_t key1_len, const uint8_t* key2, uint32_t key2_len)
-{
-	if (key1_len == key2_len) {
-		return memcmp(key1, key2, key1_len);
-	}
-	return 1;
-}
-
-// return 0 for equal
-static int entrycmp(const struct nvram_entry* entry1, const struct nvram_entry* entry2)
-{
-	if (!keycmp(entry1->key, entry1->key_len, entry2->key, entry2->key_len)) {
-		return keycmp(entry1->value, entry1->value_len, entry2->value, entry2->value_len);
-	}
-	return 1;
-}
+#include "test-common.h"
 
 // validate entry in list at pos index
 // return 0 for equal
@@ -44,14 +27,6 @@ static int check_nvram_list_entry(const struct nvram_list* list, int index, cons
 
 	printf("%s: not found in list\n", __func__);
 	return 1;
-}
-
-static void fill_entry(struct nvram_entry* entry, const char* key, const char* value)
-{
-	entry->key = (uint8_t*) key;
-	entry->key_len = strlen(key) + 1;
-	entry->value = (uint8_t*) value;
-	entry->value_len = strlen(value) + 1;
 }
 
 static int test_nvram_list_set()
@@ -264,13 +239,6 @@ error_exit:
 	return r;
 }
 
-struct test {
-	char* name;
-	int (*func)(void);
-};
-
-#define ADD_TEST(NAME) {#NAME, &NAME}
-
 struct test test_array[] = {
 		ADD_TEST(test_nvram_list_set),
 		ADD_TEST(test_nvram_list_overwrite_first),
@@ -281,23 +249,3 @@ struct test test_array[] = {
 		ADD_TEST(test_nvram_list_remove_middle),
 		{NULL, NULL},
 };
-
-int main(int argc, char** argv)
-{
-	(void) argc;
-	(void) argv;
-
-	int errors = 0;
-
-	for (int i = 0; test_array[i].name; ++i) {
-		int r = (*test_array[i].func)();
-		if (r) {
-			errors++;
-		}
-		printf("%s: %s\n", test_array[i].name, r ? "FAIL" : "PASS");
-	}
-
-	printf("Result: %s\n", errors ? "FAIL" : "PASS");
-
-	return errors;
-}
