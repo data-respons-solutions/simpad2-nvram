@@ -91,11 +91,18 @@ int libnvram_list_remove(struct libnvram_list** list, const uint8_t* key, uint32
  */
 void destroy_libnvram_list(struct libnvram_list** list);
 
+enum libnvram_type {
+	LIBNVRAM_TYPE_LIST = 0,
+};
+
 struct libnvram_header {
-	uint32_t counter;
-	uint32_t data_len;
-	uint32_t data_crc32;
-	uint32_t header_crc32;
+	uint32_t magic;
+	uint32_t user;
+	uint8_t type;
+	uint8_t reserved[3];
+	uint32_t len;
+	uint32_t crc32;
+	uint32_t hdr_crc32;
 };
 
 /*
@@ -142,8 +149,8 @@ uint32_t libnvram_serialize_size(const struct libnvram_list* list);
 
 /*
  * Create serialized data buffer from list.
- * Reads counter value from header.
- * Returns data_len, data_crc32 and header_crc32 in hdr.
+ * Reads fields user and type from hdr.
+ * Returns magic, type, len, crc32 and hdr_crc32 in hdr.
 
  * @returns
  * Bytes used

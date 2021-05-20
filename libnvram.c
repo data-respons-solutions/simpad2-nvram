@@ -13,6 +13,7 @@
 #endif
 #include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
 #include "libnvram.h"
 #include "crc32.h"
 
@@ -173,38 +174,76 @@ static uint32_t u32tole(uint32_t host)
 			| ((uint32_t) data[3] << 24);
 }
 
-#define NVRAM_HEADER_COUNTER_OFFSET 0
-#define NVRAM_HEADER_SIZE_OFFSET 4
-#define NVRAM_HEADER_DATA_CRC32_OFFSET 8
-#define NVRAM_HEADER_HEADER_CRC32_OFFSET 12
-#define NVRAM_HEADER_SIZE sizeof(uint32_t) * 4
+#define member_size(type, member) sizeof(((type *)0)->member)
 
-#define NVRAM_ENTRY_KEY_LEN_OFFSET 0
-#define NVRAM_ENTRY_VALUE_LEN_OFFSET 4
-#define NVRAM_ENTRY_DATA_OFFSET 8
-#define NVRAM_ENTRY_HEADER_SIZE sizeof(uint32_t) * 2
+#define HEADER_SIZE				24
+#define HEADER_MAGIC_VALUE		0xb32c41b4
+#define HEADER_MAGIC_OFFSET		0
+#define HEADER_MAGIC_SIZE		4
+#define HEADER_USER_OFFSET		4
+#define HEADER_USER_SIZE		4
+#define HEADER_TYPE_OFFSET		8
+#define HEADER_TYPE_SIZE		1
+#define HEADER_RSVD_OFFSET		9
+#define HEADER_RSVD_SIZE		3
+#define HEADER_LEN_OFFSET		12
+#define HEADER_LEN_SIZE			4
+#define HEADER_CRC32_OFFSET		16
+#define HEADER_CRC32_SIZE		4
+#define HEADER_HDR_CRC32_OFFSET	20
+#define HEADER_HDR_CRC32_SIZE	4
+
+static_assert(HEADER_SIZE == sizeof(struct libnvram_header), "libnvram_header size unexpected");
+static_assert(HEADER_MAGIC_SIZE == member_size(struct libnvram_header, magic), "libnvram_header.magic size unexpected");
+static_assert(HEADER_USER_SIZE == member_size(struct libnvram_header, user), "libnvram_header.user size unexpected");
+static_assert(HEADER_TYPE_SIZE == member_size(struct libnvram_header, type), "libnvram_header.type size unexpected");
+static_assert(HEADER_RSVD_SIZE == member_size(struct libnvram_header, reserved), "libnvram_header.reserved size unexpected");
+static_assert(HEADER_LEN_SIZE == member_size(struct libnvram_header, len), "libnvram_header.len size unexpected");
+static_assert(HEADER_CRC32_SIZE == member_size(struct libnvram_header, crc32), "libnvram_header.crc32 size unexpected");
+static_assert(HEADER_HDR_CRC32_SIZE == member_size(struct libnvram_header, hdr_crc32), "libnvram_header.hdr_crc32 size unexpected");
+
+#define LIST_HEADER_SIZE		8
+#define LIST_MIN_SIZE			10 // Header + key/value of length 1 each
+#define LIST_KEY_LEN_OFFSET		0
+#define LIST_KEY_LEN_SIZE		4
+#define LIST_VALUE_LEN_OFFSET	4
+#define LIST_VALUE_LEN_SIZE		4
+#define	LIST_DATA_OFFSET		8
+
+static_assert(LIST_KEY_LEN_SIZE == member_size(struct libnvram_entry, key_len), "libnvram_entry.key_len size unexpected");
+static_assert(LIST_VALUE_LEN_SIZE == member_size(struct libnvram_entry, value_len), "libnvram_entry.value_len size unexpected");
 
 uint32_t libnvram_header_len(void)
 {
-	return NVRAM_HEADER_SIZE;
+	return HEADER_SIZE;
 }
 
 int libnvram_validate_header(const uint8_t* data, uint32_t len, struct libnvram_header* hdr)
 {
-	if (len < NVRAM_HEADER_SIZE) {
+	if (len < HEADER_SIZE) {
 		return -LIBNVRAM_ERROR_INVALID;
 	}
 
-	uint32_t crc = calc_crc32(data, NVRAM_HEADER_HEADER_CRC32_OFFSET);
-	uint32_t hdr_crc = letou32(data + NVRAM_HEADER_HEADER_CRC32_OFFSET);
+	const uint32_t crc = calc_crc32(data, HEADER_HDR_CRC32_OFFSET);
+	const uint32_t hdr_crc = letou32(data + HEADER_HDR_CRC32_OFFSET);
 	if (crc != hdr_crc) {
 		return -LIBNVRAM_ERROR_CRC;
 	}
 
-	hdr->counter = letou32(data + NVRAM_HEADER_COUNTER_OFFSET);
-	hdr->data_len = letou32(data + NVRAM_HEADER_SIZE_OFFSET);
-	hdr->data_crc32 = letou32(data + NVRAM_HEADER_DATA_CRC32_OFFSET);
-	hdr->header_crc32 = hdr_crc;
+	const uint32_t magic = letou32(data + HEADER_MAGIC_OFFSET);
+	if (magic != HEADER_MAGIC_VALUE) {
+		return -LIBNVRAM_ERROR_INVALID;
+	}
+
+	hdr->magic = magic;
+	hdr->user = letou32(data + HEADER_USER_OFFSET);
+	hdr->type = *(data + HEADER_TYPE_OFFSET);
+	hdr->reserved[0] = 0;
+	hdr->reserved[1] = 0;
+	hdr->reserved[2] = 0;
+	hdr->len = letou32(data + HEADER_LEN_OFFSET);
+	hdr->crc32 = letou32(data + HEADER_CRC32_OFFSET);
+	hdr->hdr_crc32 = hdr_crc;
 
 	return 0;
 }
@@ -212,23 +251,20 @@ int libnvram_validate_header(const uint8_t* data, uint32_t len, struct libnvram_
 // returns 0 for ok or negative libnvram_error for error
 static int validate_entry(const uint8_t* data, uint32_t len, struct libnvram_entry* entry)
 {
-	//Minimum possible size of an entry where both key and value are 1 char each
-	const uint32_t min_size = NVRAM_ENTRY_HEADER_SIZE + 2;
-
-	if (len < min_size) {
+	if (len < LIST_MIN_SIZE) {
 		return -LIBNVRAM_ERROR_ILLEGAL;
 	}
 
-	const uint32_t key_len = letou32(data + NVRAM_ENTRY_KEY_LEN_OFFSET);
-	const uint32_t value_len = letou32(data + NVRAM_ENTRY_VALUE_LEN_OFFSET);
-	const uint32_t required_len = key_len + value_len + NVRAM_ENTRY_HEADER_SIZE;
+	const uint32_t key_len = letou32(data + LIST_KEY_LEN_OFFSET);
+	const uint32_t value_len = letou32(data + LIST_VALUE_LEN_OFFSET);
+	const uint32_t required_len = key_len + value_len + LIST_HEADER_SIZE;
 	if (required_len > len) {
 		return -LIBNVRAM_ERROR_ILLEGAL;
 	}
 
-	entry->key = (uint8_t*) data + NVRAM_ENTRY_DATA_OFFSET;
+	entry->key = (uint8_t*) data + LIST_DATA_OFFSET;
 	entry->key_len = key_len;
-	entry->value = (uint8_t*) data + NVRAM_ENTRY_DATA_OFFSET + key_len;
+	entry->value = (uint8_t*) data + LIST_DATA_OFFSET + key_len;
 	entry->value_len = value_len;
 
 	return 0;
@@ -236,22 +272,22 @@ static int validate_entry(const uint8_t* data, uint32_t len, struct libnvram_ent
 
 static uint32_t entry_size(const struct libnvram_entry* entry)
 {
-	return NVRAM_ENTRY_HEADER_SIZE + entry->key_len + entry->value_len;
+	return LIST_HEADER_SIZE + entry->key_len + entry->value_len;
 }
 
 int libnvram_validate_data(const uint8_t* data, uint32_t len, const struct libnvram_header* hdr)
 {
-	if (len < hdr->data_len) {
+	if (len < hdr->len) {
 		return -LIBNVRAM_ERROR_INVALID;
 	}
 
-	uint32_t crc = calc_crc32(data, hdr->data_len);
-	if (crc != hdr->data_crc32) {
+	const uint32_t crc = calc_crc32(data, hdr->len);
+	if (crc != hdr->crc32) {
 		return -LIBNVRAM_ERROR_CRC;
 	}
 
-	for (uint32_t i = 0; i < hdr->data_len;) {
-		uint32_t remaining = hdr->data_len - i;
+	for (uint32_t i = 0; i < hdr->len;) {
+		uint32_t remaining = hdr->len - i;
 		struct libnvram_entry entry;
 		int r = validate_entry(data + i, remaining, &entry);
 		if (r) {
@@ -265,17 +301,14 @@ int libnvram_validate_data(const uint8_t* data, uint32_t len, const struct libnv
 
 int libnvram_deserialize(struct libnvram_list** list, const uint8_t* data, uint32_t len, const struct libnvram_header* hdr)
 {
-	if (len < hdr->data_len) {
-		return -LIBNVRAM_ERROR_INVALID;
-	}
-	if (*list) {
+	if (len < hdr->len || hdr->type != LIBNVRAM_TYPE_LIST || *list) {
 		return -LIBNVRAM_ERROR_INVALID;
 	}
 
 	struct libnvram_list *_list = NULL;
 	int r = 0;
-	for (uint32_t i = 0; i < hdr->data_len;) {
-		uint32_t remaining = hdr->data_len - i;
+	for (uint32_t i = 0; i < hdr->len;) {
+		uint32_t remaining = hdr->len - i;
 		struct libnvram_entry entry;
 		r = validate_entry(data + i, remaining, &entry);
 		if (r) {
@@ -300,53 +333,60 @@ int libnvram_deserialize(struct libnvram_list** list, const uint8_t* data, uint3
 
 uint32_t libnvram_serialize_size(const struct libnvram_list* list)
 {
-	uint32_t size = NVRAM_HEADER_SIZE;
+	uint32_t size = HEADER_SIZE;
 	if (list) {
 		for (struct libnvram_list* cur = (struct libnvram_list*) list; cur != NULL; cur = cur->next) {
-			size += NVRAM_ENTRY_HEADER_SIZE + cur->entry->key_len + cur->entry->value_len;
+			size += entry_size(cur->entry);
 		}
 	}
 	return size;
 }
 
+static void memcpy_u32_as_le(uint8_t* data, uint32_t value)
+{
+	const uint32_t le = u32tole(value);
+	memcpy(data, &le, sizeof(le));
+}
+
 static uint32_t write_entry(uint8_t* data, const struct libnvram_entry* entry)
 {
-	const uint32_t le_key_len = u32tole(entry->key_len);
-	const uint32_t le_value_len = u32tole(entry->value_len);
-	memcpy(data + NVRAM_ENTRY_KEY_LEN_OFFSET, &le_key_len, sizeof(le_key_len));
-	memcpy(data + NVRAM_ENTRY_VALUE_LEN_OFFSET, &le_value_len, sizeof(le_value_len));
-	memcpy(data + NVRAM_ENTRY_DATA_OFFSET, entry->key, entry->key_len);
-	memcpy(data + NVRAM_ENTRY_DATA_OFFSET + entry->key_len, entry->value, entry->value_len);
-	return entry->key_len + entry->value_len + NVRAM_ENTRY_HEADER_SIZE;
+	memcpy_u32_as_le(data + LIST_KEY_LEN_OFFSET, entry->key_len);
+	memcpy_u32_as_le(data + LIST_VALUE_LEN_OFFSET, entry->value_len);
+	memcpy(data + LIST_DATA_OFFSET, entry->key, entry->key_len);
+	memcpy(data + LIST_DATA_OFFSET + entry->key_len, entry->value, entry->value_len);
+	return entry_size(entry);
 }
 
 static void write_header(uint8_t* data, struct libnvram_header* hdr)
 {
-	const uint32_t le_counter = u32tole(hdr->counter);
-	const uint32_t le_data_len = u32tole(hdr->data_len);
-	const uint32_t le_data_crc32 = u32tole(hdr->data_crc32);
-	memcpy(data + NVRAM_HEADER_COUNTER_OFFSET, &le_counter, sizeof(le_counter));
-	memcpy(data + NVRAM_HEADER_SIZE_OFFSET, &le_data_len, sizeof(le_data_len));
-	memcpy(data + NVRAM_HEADER_DATA_CRC32_OFFSET, &le_data_crc32, sizeof(le_data_crc32));
-	hdr->header_crc32 = calc_crc32(data, NVRAM_HEADER_HEADER_CRC32_OFFSET);
-	uint32_t le_header_crc32 = hdr->header_crc32;
-	memcpy(data + NVRAM_HEADER_HEADER_CRC32_OFFSET, &le_header_crc32, sizeof(le_header_crc32));
+	memcpy_u32_as_le(data + HEADER_MAGIC_OFFSET, hdr->magic);
+	memcpy_u32_as_le(data + HEADER_USER_OFFSET, hdr->user);
+	data[HEADER_TYPE_OFFSET] = hdr->type;
+	memset(data + HEADER_RSVD_OFFSET, 0, HEADER_RSVD_SIZE);
+	memcpy_u32_as_le(data + HEADER_LEN_OFFSET, hdr->len);
+	memcpy_u32_as_le(data + HEADER_CRC32_OFFSET, hdr->crc32);
+	memcpy_u32_as_le(data + HEADER_HDR_CRC32_OFFSET, hdr->hdr_crc32);
 }
 
 uint32_t libnvram_serialize(const struct libnvram_list* list, uint8_t* data, uint32_t len, struct libnvram_header* hdr)
 {
-	uint32_t required_size = libnvram_serialize_size(list);
+	if (hdr->type != LIBNVRAM_TYPE_LIST) {
+		return 0;
+	}
+
+	const uint32_t required_size = libnvram_serialize_size(list);
 	if (len < required_size) {
 		return 0;
 	}
 
-	uint32_t pos = NVRAM_HEADER_SIZE;
+	uint32_t pos = HEADER_SIZE;
 	for (struct libnvram_list* cur = (struct libnvram_list*) list; cur; cur = cur->next) {
 		pos += write_entry(data + pos, cur->entry);
 	}
 
-	hdr->data_len = pos - NVRAM_HEADER_SIZE;
-	hdr->data_crc32 = calc_crc32(data + NVRAM_HEADER_SIZE, hdr->data_len);
+	hdr->len = pos - HEADER_SIZE;
+	hdr->crc32 = calc_crc32(data + HEADER_SIZE, hdr->len);
+	hdr->hdr_crc32 = calc_crc32(data, HEADER_HDR_CRC32_OFFSET);
 
 	write_header(data, hdr);
 
@@ -355,7 +395,7 @@ uint32_t libnvram_serialize(const struct libnvram_list* list, uint8_t* data, uin
 
 uint8_t* libnvram_it_begin(const uint8_t* data, uint32_t len, const struct libnvram_header* hdr)
 {
-	if (len < hdr->data_len) {
+	if (len < hdr->len) {
 		return NULL;
 	}
 	return (uint8_t*) data;
@@ -365,15 +405,15 @@ uint8_t* libnvram_it_next(const uint8_t* it)
 {
 	struct libnvram_entry entry;
 	validate_entry(it, UINT32_MAX, &entry);
-	return (uint8_t*) it + NVRAM_ENTRY_HEADER_SIZE + entry.key_len + entry.value_len;
+	return (uint8_t*) it + LIST_HEADER_SIZE + entry.key_len + entry.value_len;
 }
 
 uint8_t* libnvram_it_end(const uint8_t* data, uint32_t len, const struct libnvram_header* hdr)
 {
-	if (len < hdr->data_len) {
+	if (len < hdr->len) {
 		return NULL;
 	}
-	return (uint8_t*) data + hdr->data_len;
+	return (uint8_t*) data + hdr->len;
 }
 
 void libnvram_it_deref(const uint8_t* it, struct libnvram_entry* entry)
@@ -410,11 +450,11 @@ static enum libnvram_active find_active(const struct libnvram_section* section_a
 	const int is_verified_a = (section_a->state & LIBNVRAM_STATE_ALL_VERIFIED) == LIBNVRAM_STATE_ALL_VERIFIED;
 	const int is_verified_b = (section_b->state & LIBNVRAM_STATE_ALL_VERIFIED) == LIBNVRAM_STATE_ALL_VERIFIED;
 	if (is_verified_a && is_verified_b) {
-		if (section_a->hdr.counter == section_b->hdr.counter) {
+		if (section_a->hdr.user == section_b->hdr.user) {
 			return LIBNVRAM_ACTIVE_A | LIBNVRAM_ACTIVE_B;
 		}
 		else
-		if (section_a->hdr.counter > section_b->hdr.counter) {
+		if (section_a->hdr.user > section_b->hdr.user) {
 			return LIBNVRAM_ACTIVE_A;
 		}
 		else {
@@ -446,20 +486,20 @@ enum libnvram_operation libnvram_next_transaction(const struct libnvram_transact
 	enum libnvram_operation op = LIBNVRAM_OPERATION_WRITE_A;
 	if ((trans->active & LIBNVRAM_ACTIVE_A) == LIBNVRAM_ACTIVE_A) {
 		op = LIBNVRAM_OPERATION_WRITE_B;
-		hdr->counter = trans->section_a.hdr.counter + 1;
+		hdr->user = trans->section_a.hdr.user + 1;
 	}
 	else
 	if ((trans->active & LIBNVRAM_ACTIVE_B) == LIBNVRAM_ACTIVE_B) {
 		op = LIBNVRAM_OPERATION_WRITE_A;
-		hdr->counter = trans->section_b.hdr.counter + 1;
+		hdr->user = trans->section_b.hdr.user + 1;
 	}
 	else {
 		op = LIBNVRAM_OPERATION_WRITE_A;
-		hdr->counter = 1;
+		hdr->user = 1;
 	}
 
-	if (hdr->counter == UINT32_MAX) {
-		hdr->counter = 1;
+	if (hdr->user == UINT32_MAX) {
+		hdr->user = 1;
 		op |= LIBNVRAM_OPERATION_COUNTER_RESET;
 	}
 
