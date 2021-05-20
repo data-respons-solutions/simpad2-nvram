@@ -1,2 +1,6 @@
 *.o
 *.a
+test-nvram-list
+test-core
+test-crc32
+test-transactional

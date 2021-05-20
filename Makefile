@@ -12,24 +12,25 @@ all: libnvram.a
 libnvram.a: crc32.o libnvram.o 
 	$(AR) rcs $@ $^
 
-libnvram-test: libnvram-test.o libnvram.a test-common.o
+test-core: test-core.o libnvram.a test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-libnvram-list-test: libnvram-list-test.o libnvram.a test-common.o
+test-nvram-list: test-nvram-list.o libnvram.a test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-libnvram-trans-test: libnvram-trans-test.o libnvram.a test-common.o
+test-transactional: test-transactional.o libnvram.a test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-libnvram-crc32-test: libnvram-crc32-test.o crc32.o test-common.o
+test-crc32: test-crc32.o crc32.o test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
    
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
-test: libnvram-test libnvram-list-test libnvram-trans-test libnvram-crc32-test
+test: test-core test-nvram-list test-transactional test-crc32
 	for test in $^; do \
+		echo "Running: $${test}"; \
 		if ! ./$${test}; then \
 			exit 1; \
 		fi \
@@ -40,13 +41,7 @@ clean:
 	rm -f crc32.o
 	rm -f libnvram.o
 	rm -f libnvram.a
-	rm -f libnvram-test.o
-	rm -f libnvram-test
-	rm -f libnvram-list-test.o
-	rm -f libnvram-list-test
-	rm -f libnvram-trans-test.o
-	rm -f libnvram-trans-test
-	rm -f libnvram-crc32-test.o
-	rm -f libnvram-crc32-test
-	
-
+	rm -f test-core test-core.o
+	rm -f test-nvram-list test-nvram-list.o
+	rm -f test-transactional test-transactional.o
+	rm -f test-crc32 test-crc32.o
