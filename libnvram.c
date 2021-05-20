@@ -322,7 +322,7 @@ int libnvram_deserialize(struct libnvram_list** list, const uint8_t* data, uint3
 	}
 
 	if (r) {
-		destroy_libnvram_list(list);
+		destroy_libnvram_list(&_list);
 	}
 	else {
 		*list = _list;
@@ -365,12 +365,13 @@ static void write_header(uint8_t* data, struct libnvram_header* hdr)
 	memset(data + HEADER_RSVD_OFFSET, 0, HEADER_RSVD_SIZE);
 	memcpy_u32_as_le(data + HEADER_LEN_OFFSET, hdr->len);
 	memcpy_u32_as_le(data + HEADER_CRC32_OFFSET, hdr->crc32);
+	hdr->hdr_crc32 = calc_crc32(data, HEADER_HDR_CRC32_OFFSET);
 	memcpy_u32_as_le(data + HEADER_HDR_CRC32_OFFSET, hdr->hdr_crc32);
 }
 
 uint32_t libnvram_serialize(const struct libnvram_list* list, uint8_t* data, uint32_t len, struct libnvram_header* hdr)
 {
-	if (hdr->type != LIBNVRAM_TYPE_LIST) {
+	if ((hdr->type != LIBNVRAM_TYPE_LIST) || !data) {
 		return 0;
 	}
 
@@ -384,9 +385,9 @@ uint32_t libnvram_serialize(const struct libnvram_list* list, uint8_t* data, uin
 		pos += write_entry(data + pos, cur->entry);
 	}
 
+	hdr->magic = HEADER_MAGIC_VALUE;
 	hdr->len = pos - HEADER_SIZE;
 	hdr->crc32 = calc_crc32(data + HEADER_SIZE, hdr->len);
-	hdr->hdr_crc32 = calc_crc32(data, HEADER_HDR_CRC32_OFFSET);
 
 	write_header(data, hdr);
 
