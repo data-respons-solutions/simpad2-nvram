@@ -473,16 +473,16 @@ struct test {
 	int (*func)(void);
 };
 
-#define FUNC_NAME(NAME) #NAME
+#define ADD_TEST(NAME) {#NAME, &NAME}
 
 struct test test_array[] = {
-		{FUNC_NAME(test_nvram_init_transaction), &test_nvram_init_transaction},
-		{FUNC_NAME(test_nvram_init_transaction_corrupt_header), &test_nvram_init_transaction_corrupt_header},
-		{FUNC_NAME(test_nvram_init_transaction_corrupt_data), &test_nvram_init_transaction_corrupt_data},
-		{FUNC_NAME(test_nvram_next_transaction), &test_nvram_next_transaction},
-		{FUNC_NAME(test_nvram_next_transaction_new), &test_nvram_next_transaction_new},
-		{FUNC_NAME(test_nvram_next_transaction_counter_reset), &test_nvram_next_transaction_counter_reset},
-		{FUNC_NAME(test_nvram_update_transaction), &test_nvram_update_transaction},
+		ADD_TEST(test_nvram_init_transaction),
+		ADD_TEST(test_nvram_init_transaction_corrupt_header),
+		ADD_TEST(test_nvram_init_transaction_corrupt_data),
+		ADD_TEST(test_nvram_next_transaction),
+		ADD_TEST(test_nvram_next_transaction_new),
+		ADD_TEST(test_nvram_next_transaction_counter_reset),
+		ADD_TEST(test_nvram_update_transaction),
 		{NULL, NULL},
 };
 

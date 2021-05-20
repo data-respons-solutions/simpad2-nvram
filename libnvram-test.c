@@ -541,23 +541,23 @@ struct test {
 	int (*func)(void);
 };
 
-#define FUNC_NAME(NAME) #NAME
+#define ADD_TEST(NAME) {#NAME, &NAME}
 
 struct test test_array[] = {
-		{FUNC_NAME(test_nvram_header_size), &test_nvram_header_size},
-		{FUNC_NAME(test_nvram_validate_header), &test_nvram_validate_header},
-		{FUNC_NAME(test_nvram_validate_header_corrupt), &test_nvram_validate_header_corrupt},
-		{FUNC_NAME(test_nvram_validate_data), &test_nvram_validate_data},
-		{FUNC_NAME(test_nvram_validate_data_crc_corrupt), &test_nvram_validate_data_crc_corrupt},
-		{FUNC_NAME(test_nvram_validate_data_entry_corrupt), &test_nvram_validate_data_entry_corrupt},
-		{FUNC_NAME(test_nvram_deserialize), &test_nvram_deserialize},
-		{FUNC_NAME(test_nvram_deserialize_single), &test_nvram_deserialize_single},
-		{FUNC_NAME(test_nvram_deserialize_empty_data), &test_nvram_deserialize_empty_data},
-		{FUNC_NAME(test_nvram_serialize_size), &test_nvram_serialize_size},
-		{FUNC_NAME(test_nvram_serialize_size_empty_data), &test_nvram_serialize_size_empty_data},
-		{FUNC_NAME(test_nvram_serialize), &test_nvram_serialize},
-		{FUNC_NAME(test_nvram_serialize_empty_data), &test_nvram_serialize_empty_data},
-		{FUNC_NAME(test_iterator), &test_iterator},
+		ADD_TEST(test_nvram_header_size),
+		ADD_TEST(test_nvram_validate_header),
+		ADD_TEST(test_nvram_validate_header_corrupt),
+		ADD_TEST(test_nvram_validate_data),
+		ADD_TEST(test_nvram_validate_data_crc_corrupt),
+		ADD_TEST(test_nvram_validate_data_entry_corrupt),
+		ADD_TEST(test_nvram_deserialize),
+		ADD_TEST(test_nvram_deserialize_single),
+		ADD_TEST(test_nvram_deserialize_empty_data),
+		ADD_TEST(test_nvram_serialize_size),
+		ADD_TEST(test_nvram_serialize_size_empty_data),
+		ADD_TEST(test_nvram_serialize),
+		ADD_TEST(test_nvram_serialize_empty_data),
+		ADD_TEST(test_iterator),
 		{NULL, NULL},
 };
 

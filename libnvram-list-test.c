@@ -269,16 +269,16 @@ struct test {
 	int (*func)(void);
 };
 
-#define FUNC_NAME(NAME) #NAME
+#define ADD_TEST(NAME) {#NAME, &NAME}
 
 struct test test_array[] = {
-		{FUNC_NAME(test_nvram_list_set), &test_nvram_list_set},
-		{FUNC_NAME(test_nvram_list_overwrite_first), &test_nvram_list_overwrite_first},
-		{FUNC_NAME(test_nvram_list_overwrite_second), &test_nvram_list_overwrite_second},
-		{FUNC_NAME(test_nvram_list_remove), &test_nvram_list_remove},
-		{FUNC_NAME(test_nvram_list_remove_first), &test_nvram_list_remove_first},
-		{FUNC_NAME(test_nvram_list_remove_second), &test_nvram_list_remove_second},
-		{FUNC_NAME(test_nvram_list_remove_middle), &test_nvram_list_remove_middle},
+		ADD_TEST(test_nvram_list_set),
+		ADD_TEST(test_nvram_list_overwrite_first),
+		ADD_TEST(test_nvram_list_overwrite_second),
+		ADD_TEST(test_nvram_list_remove),
+		ADD_TEST(test_nvram_list_remove_first),
+		ADD_TEST(test_nvram_list_remove_second),
+		ADD_TEST(test_nvram_list_remove_middle),
 		{NULL, NULL},
 };
 
