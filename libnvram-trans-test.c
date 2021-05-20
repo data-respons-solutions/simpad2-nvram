@@ -101,9 +101,9 @@ static int test_nvram_init_transaction()
 		goto error_exit;
 	}
 
-	return 1;
-error_exit:
 	return 0;
+error_exit:
+	return 1;
 }
 
 static int test_nvram_init_transaction_corrupt_header()
@@ -180,9 +180,9 @@ static int test_nvram_init_transaction_corrupt_header()
 		goto error_exit;
 	}
 
-	return 1;
-error_exit:
 	return 0;
+error_exit:
+	return 1;
 }
 static int test_nvram_init_transaction_corrupt_data()
 {
@@ -272,9 +272,9 @@ static int test_nvram_init_transaction_corrupt_data()
 		goto error_exit;
 	}
 
-	return 1;
-error_exit:
 	return 0;
+error_exit:
+	return 1;
 }
 
 static int test_nvram_next_transaction()
@@ -315,9 +315,9 @@ static int test_nvram_next_transaction()
 		goto error_exit;
 	}
 
-	return 1;
-error_exit:
 	return 0;
+error_exit:
+	return 1;
 }
 
 static int test_nvram_next_transaction_new()
@@ -340,9 +340,9 @@ static int test_nvram_next_transaction_new()
 		goto error_exit;
 	}
 
-	return 1;
-error_exit:
 	return 0;
+error_exit:
+	return 1;
 }
 
 static int test_nvram_next_transaction_counter_reset()
@@ -383,9 +383,9 @@ static int test_nvram_next_transaction_counter_reset()
 		goto error_exit;
 	}
 
-	return 1;
-error_exit:
 	return 0;
+error_exit:
+	return 1;
 }
 
 static int test_nvram_update_transaction()
@@ -463,9 +463,9 @@ static int test_nvram_update_transaction()
 		goto error_exit;
 	}
 
-	return 1;
-error_exit:
 	return 0;
+error_exit:
+	return 1;
 }
 
 struct test {
@@ -495,16 +495,13 @@ int main(int argc, char** argv)
 
 	for (int i = 0; test_array[i].name; ++i) {
 		int r = (*test_array[i].func)();
-		if (!r) {
+		if (r) {
 			errors++;
 		}
-		printf("%s: %s\n", test_array[i].name, r ? "PASS" : "FAIL");
+		printf("%s: %s\n", test_array[i].name, r ? "FAIL" : "PASS");
 	}
 
 	printf("Result: %s\n", errors ? "FAIL" : "PASS");
 
-	if(errors) {
-		return 1;
-	}
-	return 0;
+	return errors;
 }

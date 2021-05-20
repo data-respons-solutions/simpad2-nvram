@@ -36,10 +36,10 @@ static int test_nvram_header_size()
 {
 	if (nvram_header_len() != 16) {
 		printf("nvram_header_len != 16\n");
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_nvram_validate_header()
@@ -55,30 +55,30 @@ static int test_nvram_validate_header()
 	int r = nvram_validate_header(test_section, sizeof(test_section), &hdr);
 	if (r) {
 		printf("nvram_validate_header: %s\n", strerror(-r));
-		return 0;
+		return 1;
 	}
 
 	if (hdr.counter != 16) {
 		printf("header wrong counter returned\n");
-		return 0;
+		return 1;
 	}
 
 	if (hdr.data_len != 39) {
 		printf("header wrong data_len returned\n");
-		return 0;
+		return 1;
 	}
 
 	if (hdr.data_crc32 != 0xefbf9778) {
 		printf("header wrong data_crc32 returned\n");
-		return 0;
+		return 1;
 	}
 
 	if (hdr.header_crc32 != 0x6315be77) {
 		printf("header wrong header_crc32 returned\n");
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_nvram_validate_header_corrupt()
@@ -94,10 +94,10 @@ static int test_nvram_validate_header_corrupt()
 	int r = nvram_validate_header(test_section, sizeof(test_section), &hdr);
 	if (!r) {
 		printf("nvram_validate_header no error\n");
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_nvram_validate_data()
@@ -118,10 +118,10 @@ static int test_nvram_validate_data()
 	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
 	if (r) {
 		printf("nvram_validate_data: %s\n", strerror(-r));
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_nvram_validate_data_crc_corrupt()
@@ -142,10 +142,10 @@ static int test_nvram_validate_data_crc_corrupt()
 	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
 	if (!r) {
 		printf("nvram_validate_data no error\n");
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_nvram_validate_data_entry_corrupt()
@@ -166,10 +166,10 @@ static int test_nvram_validate_data_entry_corrupt()
 	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
 	if (!r) {
 		printf("nvram_validate_data no error\n");
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_nvram_deserialize()
@@ -215,11 +215,11 @@ static int test_nvram_deserialize()
 	}
 
 	destroy_nvram_list(&list);
-	return 1;
+	return 0;
 
 error_exit:
 	destroy_nvram_list(&list);
-	return 0;
+	return 1;
 }
 
 static int test_nvram_deserialize_single()
@@ -262,11 +262,11 @@ static int test_nvram_deserialize_single()
 	}
 
 	destroy_nvram_list(&list);
-	return 1;
+	return 0;
 
 error_exit:
 	destroy_nvram_list(&list);
-	return 0;
+	return 1;
 }
 
 static int test_nvram_deserialize_empty_data()
@@ -294,11 +294,11 @@ static int test_nvram_deserialize_empty_data()
 		goto error_exit;
 	}
 
-	return 1;
+	return 0;
 
 error_exit:
 	destroy_nvram_list(&list);
-	return 0;
+	return 1;
 }
 
 static int test_nvram_serialize_size()
@@ -320,11 +320,11 @@ static int test_nvram_serialize_size()
 
 	destroy_nvram_list(&list);
 
-	return 1;
+	return 0;
 
 error_exit:
 	destroy_nvram_list(&list);
-	return 0;
+	return 1;
 }
 
 static int test_nvram_serialize_size_empty_data()
@@ -336,10 +336,10 @@ static int test_nvram_serialize_size_empty_data()
 		goto error_exit;
 	}
 
-	return 1;
+	return 0;
 
 error_exit:
-	return 0;
+	return 1;
 }
 
 static int test_nvram_serialize()
@@ -411,11 +411,11 @@ static int test_nvram_serialize()
 	}
 
 	destroy_nvram_list(&list);
-	return 1;
+	return 0;
 
 error_exit:
 	destroy_nvram_list(&list);
-	return 0;
+	return 1;
 }
 
 static int test_nvram_serialize_empty_data()
@@ -470,11 +470,11 @@ static int test_nvram_serialize_empty_data()
 	}
 
 	destroy_nvram_list(&list);
-	return 1;
+	return 0;
 
 error_exit:
 	destroy_nvram_list(&list);
-	return 0;
+	return 1;
 }
 
 static int test_iterator()
@@ -529,10 +529,10 @@ static int test_iterator()
 		goto error_exit;
 	}
 
-	return 1;
+	return 0;
 
 error_exit:
-	return 0;
+	return 1;
 }
 
 
@@ -570,16 +570,13 @@ int main(int argc, char** argv)
 
 	for (int i = 0; test_array[i].name; ++i) {
 		int r = (*test_array[i].func)();
-		if (!r) {
+		if (r) {
 			errors++;
 		}
-		printf("%s: %s\n", test_array[i].name, r ? "PASS" : "FAIL");
+		printf("%s: %s\n", test_array[i].name, r ? "FAIL" : "PASS");
 	}
 
 	printf("Result: %s\n", errors ? "FAIL" : "PASS");
 
-	if(errors) {
-		return 1;
-	}
-	return 0;
+	return errors;
 }

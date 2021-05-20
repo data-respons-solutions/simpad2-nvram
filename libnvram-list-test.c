@@ -64,7 +64,8 @@ static int test_nvram_list_set()
 	fill_entry(&entry3, "TEST3", "ghi");
 	struct nvram_list *list = NULL;
 
-	int r = 0;
+	int r = 1;
+
 	nvram_list_set(&list, &entry1);
 	if (check_nvram_list_entry(list, 0, &entry1)) {
 		goto error_exit;
@@ -78,7 +79,7 @@ static int test_nvram_list_set()
 		goto error_exit;
 	}
 
-	r = 1;
+	r = 0;
 error_exit:
 	destroy_nvram_list(&list);
 	return r;
@@ -92,7 +93,7 @@ static int test_nvram_list_overwrite_first()
 	fill_entry(&value2, "TEST1", "def");
 
 	struct nvram_list *list = NULL;
-	int r = 0;
+	int r = 1;
 
 	nvram_list_set(&list, &value1);
 	if (check_nvram_list_entry(list, 0, &value1)) {
@@ -103,7 +104,7 @@ static int test_nvram_list_overwrite_first()
 		goto error_exit;
 	}
 
-	r = 1;
+	r = 0;
 error_exit:
 	destroy_nvram_list(&list);
 	return r;
@@ -119,7 +120,7 @@ static int test_nvram_list_overwrite_second()
 	fill_entry(&value2, "TEST2", "ghi");
 
 	struct nvram_list *list = NULL;
-	int r = 0;
+	int r = 1;
 
 	nvram_list_set(&list, &entry1);
 	if (check_nvram_list_entry(list, 0, &entry1)) {
@@ -134,7 +135,7 @@ static int test_nvram_list_overwrite_second()
 		goto error_exit;
 	}
 
-	r = 1;
+	r = 0;
 error_exit:
 	destroy_nvram_list(&list);
 	return r;
@@ -146,7 +147,7 @@ static int test_nvram_list_remove()
 	fill_entry(&entry1, "TEST1", "abc");
 
 	struct nvram_list *list = NULL;
-	int r = 0;
+	int r = 1;
 
 	nvram_list_set(&list, &entry1);
 	if (check_nvram_list_entry(list, 0, &entry1)) {
@@ -157,7 +158,7 @@ static int test_nvram_list_remove()
 		goto error_exit;
 	}
 
-	r = 1;
+	r = 0;
 error_exit:
 	destroy_nvram_list(&list);
 	return r;
@@ -171,7 +172,7 @@ static int test_nvram_list_remove_first()
 	fill_entry(&entry2, "TEST2", "def");
 
 	struct nvram_list *list = NULL;
-	int r = 0;
+	int r = 1;
 
 	nvram_list_set(&list, &entry1);
 	if (check_nvram_list_entry(list, 0, &entry1)) {
@@ -186,7 +187,7 @@ static int test_nvram_list_remove_first()
 		goto error_exit;
 	}
 
-	r = 1;
+	r = 0;
 error_exit:
 	destroy_nvram_list(&list);
 	return r;
@@ -200,7 +201,7 @@ static int test_nvram_list_remove_second()
 	fill_entry(&entry2, "TEST2", "def");
 
 	struct nvram_list *list = NULL;
-	int r = 0;
+	int r = 1;
 
 	nvram_list_set(&list, &entry1);
 	if (check_nvram_list_entry(list, 0, &entry1)) {
@@ -215,7 +216,7 @@ static int test_nvram_list_remove_second()
 		goto error_exit;
 	}
 
-	r = 1;
+	r = 0;
 error_exit:
 	destroy_nvram_list(&list);
 	return r;
@@ -231,7 +232,7 @@ static int test_nvram_list_remove_middle()
 	fill_entry(&entry3, "TEST3", "ghi");
 
 	struct nvram_list *list = NULL;
-	int r = 0;
+	int r = 1;
 
 	nvram_list_set(&list, &entry1);
 	if (check_nvram_list_entry(list, 0, &entry1)) {
@@ -257,7 +258,7 @@ static int test_nvram_list_remove_middle()
 		goto error_exit;
 	}
 
-	r = 1;
+	r = 0;
 error_exit:
 	destroy_nvram_list(&list);
 	return r;
@@ -290,16 +291,13 @@ int main(int argc, char** argv)
 
 	for (int i = 0; test_array[i].name; ++i) {
 		int r = (*test_array[i].func)();
-		if (!r) {
+		if (r) {
 			errors++;
 		}
-		printf("%s: %s\n", test_array[i].name, r ? "PASS" : "FAIL");
+		printf("%s: %s\n", test_array[i].name, r ? "FAIL" : "PASS");
 	}
 
 	printf("Result: %s\n", errors ? "FAIL" : "PASS");
 
-	if(errors) {
-		return 1;
-	}
-	return 0;
+	return errors;
 }

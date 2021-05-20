@@ -20,10 +20,10 @@ static int test_crc32_1(void)
 
 	if (data_crc32 != crc32) {
 		printf("0x%08x != 0x%08x\n", data_crc32, crc32);
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_crc32_2(void)
@@ -37,10 +37,10 @@ static int test_crc32_2(void)
 
 	if (data_crc32 != crc32) {
 		printf("0x%08x != 0x%08x\n", data_crc32, crc32);
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_crc32_empty(void)
@@ -51,10 +51,10 @@ static int test_crc32_empty(void)
 
 	if (data_crc32 != crc32) {
 		printf("0x%08x != 0x%08x\n", data_crc32, crc32);
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int test_crc32_data_zero(void)
@@ -67,10 +67,10 @@ static int test_crc32_data_zero(void)
 
 	if (data_crc32 != crc32) {
 		printf("0x%08x != 0x%08x\n", data_crc32, crc32);
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 struct test {
@@ -97,16 +97,13 @@ int main(int argc, char** argv)
 
 	for (int i = 0; test_array[i].name; ++i) {
 		int r = (*test_array[i].func)();
-		if (!r) {
+		if (r) {
 			errors++;
 		}
-		printf("%s: %s\n", test_array[i].name, r ? "PASS" : "FAIL");
+		printf("%s: %s\n", test_array[i].name, r ? "FAIL" : "PASS");
 	}
 
 	printf("Result: %s\n", errors ? "FAIL" : "PASS");
 
-	if(errors) {
-		return 1;
-	}
-	return 0;
+	return errors;
 }
