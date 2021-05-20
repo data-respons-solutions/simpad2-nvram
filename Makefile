@@ -20,12 +20,15 @@ libnvram-list-test: libnvram-list-test.o libnvram.a
 	
 libnvram-trans-test: libnvram-trans-test.o libnvram.a
 	$(CC) -o $@ $^ $(LDFLAGS)
+	
+libnvram-crc32-test: libnvram-crc32-test.o crc32.o
+	$(CC) -o $@ $^ $(LDFLAGS)
    
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
-test: libnvram-test libnvram-list-test libnvram-trans-test
+test: libnvram-test libnvram-list-test libnvram-trans-test libnvram-crc32-test
 	for test in $^; do \
 		if ! ./$${test}; then \
 			exit 1; \
@@ -43,4 +46,7 @@ clean:
 	rm -f libnvram-list-test
 	rm -f libnvram-trans-test.o
 	rm -f libnvram-trans-test
+	rm -f libnvram-crc32-test.o
+	rm -f libnvram-crc32-test
+	
 
