@@ -6,9 +6,9 @@
 #include "libnvram.h"
 #include "test-common.h"
 
-static int test_nvram_init_transaction()
+static int test_libnvram_init_transaction()
 {
-	struct nvram_header hdr1;
+	struct libnvram_header hdr1;
 	hdr1.counter = 16;
 	hdr1.data_len = 39;
 	hdr1.data_crc32 = 0x6c9dd729;
@@ -27,7 +27,7 @@ static int test_nvram_init_transaction()
 	};
 
 
-	struct nvram_header hdr2;
+	struct libnvram_header hdr2;
 	hdr2.counter = 10;
 	hdr2.data_len = 39;
 	hdr2.data_crc32 = 0x6c9dd729;
@@ -46,11 +46,11 @@ static int test_nvram_init_transaction()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 
 	memset(&trans, 0, sizeof(trans));
-	nvram_init_transaction(&trans, data1, sizeof(data1), data2, sizeof(data2));
-	if (trans.active != NVRAM_ACTIVE_A) {
+	libnvram_init_transaction(&trans, data1, sizeof(data1), data2, sizeof(data2));
+	if (trans.active != LIBNVRAM_ACTIVE_A) {
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
@@ -62,18 +62,18 @@ static int test_nvram_init_transaction()
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
-	if (trans.section_a.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_a.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_a wrong state\n");
 		goto error_exit;
 	}
-	if (trans.section_b.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_b.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_b wrong state\n");
 		goto error_exit;
 	}
 
 	memset(&trans, 0, sizeof(trans));
-	nvram_init_transaction(&trans, data2, sizeof(data2), data1, sizeof(data1));
-	if (trans.active != NVRAM_ACTIVE_B) {
+	libnvram_init_transaction(&trans, data2, sizeof(data2), data1, sizeof(data1));
+	if (trans.active != LIBNVRAM_ACTIVE_B) {
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
@@ -85,18 +85,18 @@ static int test_nvram_init_transaction()
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
-	if (trans.section_a.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_a.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_a wrong state\n");
 		goto error_exit;
 	}
-	if (trans.section_b.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_b.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_b wrong state\n");
 		goto error_exit;
 	}
 
 	memset(&trans, 0, sizeof(trans));
-	nvram_init_transaction(&trans, data1, sizeof(data1), data1, sizeof(data1));
-	if (trans.active != (NVRAM_ACTIVE_A | NVRAM_ACTIVE_B)) {
+	libnvram_init_transaction(&trans, data1, sizeof(data1), data1, sizeof(data1));
+	if (trans.active != (LIBNVRAM_ACTIVE_A | LIBNVRAM_ACTIVE_B)) {
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
@@ -106,9 +106,9 @@ error_exit:
 	return 1;
 }
 
-static int test_nvram_init_transaction_corrupt_header()
+static int test_libnvram_init_transaction_corrupt_header()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	hdr.data_len = 39;
 	hdr.data_crc32 = 0x6c9dd729;
@@ -124,7 +124,7 @@ static int test_nvram_init_transaction_corrupt_header()
 	};
 
 	/*
-	struct nvram_header corrupt;
+	struct libnvram_header corrupt;
 	hdr.counter = 10;
 	hdr.data_len = 39;
 	hdr.data_crc32 = 0x6c9dd729;
@@ -140,11 +140,11 @@ static int test_nvram_init_transaction_corrupt_header()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 
 	memset(&trans, 0, sizeof(trans));
-	nvram_init_transaction(&trans, data2, sizeof(data2), data1, sizeof(data1));
-	if (trans.active != NVRAM_ACTIVE_B) {
+	libnvram_init_transaction(&trans, data2, sizeof(data2), data1, sizeof(data1));
+	if (trans.active != LIBNVRAM_ACTIVE_B) {
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
@@ -152,18 +152,18 @@ static int test_nvram_init_transaction_corrupt_header()
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
-	if (trans.section_a.state != NVRAM_STATE_HEADER_CORRUPT) {
+	if (trans.section_a.state != LIBNVRAM_STATE_HEADER_CORRUPT) {
 		printf("section_a wrong state\n");
 		goto error_exit;
 	}
-	if (trans.section_b.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_b.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_b wrong state\n");
 		goto error_exit;
 	}
 
 	memset(&trans, 0, sizeof(trans));
-	nvram_init_transaction(&trans, data1, sizeof(data1), data2, sizeof(data2));
-	if (trans.active != NVRAM_ACTIVE_A) {
+	libnvram_init_transaction(&trans, data1, sizeof(data1), data2, sizeof(data2));
+	if (trans.active != LIBNVRAM_ACTIVE_A) {
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
@@ -171,11 +171,11 @@ static int test_nvram_init_transaction_corrupt_header()
 		printf("header1 wrong\n");
 		goto error_exit;
 	}
-	if (trans.section_a.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_a.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_a wrong state\n");
 		goto error_exit;
 	}
-	if (trans.section_b.state != NVRAM_STATE_HEADER_CORRUPT) {
+	if (trans.section_b.state != LIBNVRAM_STATE_HEADER_CORRUPT) {
 		printf("section_b wrong state\n");
 		goto error_exit;
 	}
@@ -184,9 +184,9 @@ static int test_nvram_init_transaction_corrupt_header()
 error_exit:
 	return 1;
 }
-static int test_nvram_init_transaction_corrupt_data()
+static int test_libnvram_init_transaction_corrupt_data()
 {
-	struct nvram_header hdr1;
+	struct libnvram_header hdr1;
 	hdr1.counter = 16;
 	hdr1.data_len = 39;
 	hdr1.data_crc32 = 0x6c9dd729;
@@ -205,7 +205,7 @@ static int test_nvram_init_transaction_corrupt_data()
 	};
 
 
-	struct nvram_header hdr2;
+	struct libnvram_header hdr2;
 	hdr2.counter = 10;
 	hdr2.data_len = 39;
 	hdr2.data_crc32 = 0x6c9dd729;
@@ -224,11 +224,11 @@ static int test_nvram_init_transaction_corrupt_data()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x67
 	};
 
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 
 	memset(&trans, 0, sizeof(trans));
-	nvram_init_transaction(&trans, data1, sizeof(data1), corrupt, sizeof(corrupt));
-	if (trans.active != NVRAM_ACTIVE_A) {
+	libnvram_init_transaction(&trans, data1, sizeof(data1), corrupt, sizeof(corrupt));
+	if (trans.active != LIBNVRAM_ACTIVE_A) {
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
@@ -240,18 +240,18 @@ static int test_nvram_init_transaction_corrupt_data()
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
-	if (trans.section_a.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_a.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_a wrong state\n");
 		goto error_exit;
 	}
-	if (trans.section_b.state != (NVRAM_STATE_HEADER_VERIFIED | NVRAM_STATE_DATA_CORRUPT)) {
+	if (trans.section_b.state != (LIBNVRAM_STATE_HEADER_VERIFIED | LIBNVRAM_STATE_DATA_CORRUPT)) {
 		printf("section_b wrong state\n");
 		goto error_exit;
 	}
 
 	memset(&trans, 0, sizeof(trans));
-	nvram_init_transaction(&trans, corrupt, sizeof(corrupt), data1, sizeof(data1));
-	if (trans.active != NVRAM_ACTIVE_B) {
+	libnvram_init_transaction(&trans, corrupt, sizeof(corrupt), data1, sizeof(data1));
+	if (trans.active != LIBNVRAM_ACTIVE_B) {
 		printf("Wrong section active\n");
 		goto error_exit;
 	}
@@ -263,11 +263,11 @@ static int test_nvram_init_transaction_corrupt_data()
 		printf("header2 wrong\n");
 		goto error_exit;
 	}
-	if (trans.section_a.state != (NVRAM_STATE_HEADER_VERIFIED | NVRAM_STATE_DATA_CORRUPT)) {
+	if (trans.section_a.state != (LIBNVRAM_STATE_HEADER_VERIFIED | LIBNVRAM_STATE_DATA_CORRUPT)) {
 		printf("section_a wrong state\n");
 		goto error_exit;
 	}
-	if (trans.section_b.state != NVRAM_STATE_ALL_VERIFIED) {
+	if (trans.section_b.state != LIBNVRAM_STATE_ALL_VERIFIED) {
 		printf("section_b wrong state\n");
 		goto error_exit;
 	}
@@ -277,20 +277,20 @@ error_exit:
 	return 1;
 }
 
-static int test_nvram_next_transaction()
+static int test_libnvram_next_transaction()
 {
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 	memset(&trans, 0, sizeof(trans));
 
 	trans.section_a.hdr.counter = 16;
-	trans.section_a.state = NVRAM_STATE_ALL_VERIFIED;
+	trans.section_a.state = LIBNVRAM_STATE_ALL_VERIFIED;
 	trans.section_b.hdr.counter = 10;
-	trans.section_b.state = NVRAM_STATE_ALL_VERIFIED;
-	trans.active = NVRAM_ACTIVE_A;
+	trans.section_b.state = LIBNVRAM_STATE_ALL_VERIFIED;
+	trans.active = LIBNVRAM_ACTIVE_A;
 
-	struct nvram_header new;
-	enum nvram_operation op = nvram_next_transaction(&trans, &new);
-	if (op != NVRAM_OPERATION_WRITE_B) {
+	struct libnvram_header new;
+	enum libnvram_operation op = libnvram_next_transaction(&trans, &new);
+	if (op != LIBNVRAM_OPERATION_WRITE_B) {
 		printf("wrong operation returned");
 		goto error_exit;
 	}
@@ -300,13 +300,13 @@ static int test_nvram_next_transaction()
 	}
 
 	trans.section_a.hdr.counter = 10;
-	trans.section_a.state = NVRAM_STATE_ALL_VERIFIED;
+	trans.section_a.state = LIBNVRAM_STATE_ALL_VERIFIED;
 	trans.section_b.hdr.counter = 6;
-	trans.section_b.state = NVRAM_STATE_ALL_VERIFIED;
-	trans.active = NVRAM_ACTIVE_B;
+	trans.section_b.state = LIBNVRAM_STATE_ALL_VERIFIED;
+	trans.active = LIBNVRAM_ACTIVE_B;
 
-	op = nvram_next_transaction(&trans, &new);
-	if (op != NVRAM_OPERATION_WRITE_A) {
+	op = libnvram_next_transaction(&trans, &new);
+	if (op != LIBNVRAM_OPERATION_WRITE_A) {
 		printf("wrong operation returned");
 		goto error_exit;
 	}
@@ -320,18 +320,18 @@ error_exit:
 	return 1;
 }
 
-static int test_nvram_next_transaction_new()
+static int test_libnvram_next_transaction_new()
 {
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 	memset(&trans, 0, sizeof(trans));
 
-	trans.section_a.state = NVRAM_STATE_HEADER_CORRUPT;
-	trans.section_b.state = NVRAM_STATE_HEADER_CORRUPT;
-	trans.active = NVRAM_ACTIVE_NONE;
+	trans.section_a.state = LIBNVRAM_STATE_HEADER_CORRUPT;
+	trans.section_b.state = LIBNVRAM_STATE_HEADER_CORRUPT;
+	trans.active = LIBNVRAM_ACTIVE_NONE;
 
-	struct nvram_header new;
-	enum nvram_operation op = nvram_next_transaction(&trans, &new);
-	if (op != NVRAM_OPERATION_WRITE_A) {
+	struct libnvram_header new;
+	enum libnvram_operation op = libnvram_next_transaction(&trans, &new);
+	if (op != LIBNVRAM_OPERATION_WRITE_A) {
 		printf("wrong operation returned");
 		goto error_exit;
 	}
@@ -345,20 +345,20 @@ error_exit:
 	return 1;
 }
 
-static int test_nvram_next_transaction_counter_reset()
+static int test_libnvram_next_transaction_counter_reset()
 {
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 	memset(&trans, 0, sizeof(trans));
 
 	trans.section_a.hdr.counter = UINT32_MAX - 1;
-	trans.section_a.state = NVRAM_STATE_ALL_VERIFIED;
+	trans.section_a.state = LIBNVRAM_STATE_ALL_VERIFIED;
 	trans.section_b.hdr.counter = UINT32_MAX - 2;
-	trans.section_b.state = NVRAM_STATE_ALL_VERIFIED;
-	trans.active = NVRAM_ACTIVE_A;
+	trans.section_b.state = LIBNVRAM_STATE_ALL_VERIFIED;
+	trans.active = LIBNVRAM_ACTIVE_A;
 
-	struct nvram_header new;
-	enum nvram_operation op = nvram_next_transaction(&trans, &new);
-	if (op != (NVRAM_OPERATION_WRITE_B | NVRAM_OPERATION_COUNTER_RESET)) {
+	struct libnvram_header new;
+	enum libnvram_operation op = libnvram_next_transaction(&trans, &new);
+	if (op != (LIBNVRAM_OPERATION_WRITE_B | LIBNVRAM_OPERATION_COUNTER_RESET)) {
 		printf("wrong operation returned");
 		goto error_exit;
 	}
@@ -368,13 +368,13 @@ static int test_nvram_next_transaction_counter_reset()
 	}
 
 	trans.section_a.hdr.counter = UINT32_MAX - 2;
-	trans.section_a.state = NVRAM_STATE_ALL_VERIFIED;
+	trans.section_a.state = LIBNVRAM_STATE_ALL_VERIFIED;
 	trans.section_b.hdr.counter = UINT32_MAX - 1;
-	trans.section_b.state = NVRAM_STATE_ALL_VERIFIED;
-	trans.active = NVRAM_ACTIVE_B;
+	trans.section_b.state = LIBNVRAM_STATE_ALL_VERIFIED;
+	trans.active = LIBNVRAM_ACTIVE_B;
 
-	op = nvram_next_transaction(&trans, &new);
-	if (op != (NVRAM_OPERATION_WRITE_A | NVRAM_OPERATION_COUNTER_RESET)) {
+	op = libnvram_next_transaction(&trans, &new);
+	if (op != (LIBNVRAM_OPERATION_WRITE_A | LIBNVRAM_OPERATION_COUNTER_RESET)) {
 		printf("wrong operation returned");
 		goto error_exit;
 	}
@@ -388,32 +388,32 @@ error_exit:
 	return 1;
 }
 
-static int test_nvram_update_transaction()
+static int test_libnvram_update_transaction()
 {
-	struct nvram_header hdr1;
+	struct libnvram_header hdr1;
 	hdr1.counter = 16;
 	hdr1.data_len = 39;
 	hdr1.data_crc32 = 0x12345678;
 	hdr1.header_crc32 = 0x87654321;
 
-	struct nvram_header hdr2;
+	struct libnvram_header hdr2;
 	hdr2.counter = 10;
 	hdr2.data_len = 10;
 	hdr2.data_crc32 = 0xfedcba98;
 	hdr2.header_crc32 = 0x89abcdef;
 
-	struct nvram_header hdr3;
+	struct libnvram_header hdr3;
 	hdr3.counter = 866;
 	hdr3.data_len = 9;
 	hdr3.data_crc32 = 0x00ff00ff;
 	hdr3.header_crc32 = 0xff00ff00;
 
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 	memset(&trans, 0, sizeof(trans));
 	memcpy(&trans.section_a.hdr, &hdr1, sizeof(hdr1));
 	memcpy(&trans.section_b.hdr, &hdr2, sizeof(hdr2));
-	trans.active = NVRAM_ACTIVE_A;
-	nvram_update_transaction(&trans, NVRAM_OPERATION_WRITE_B, &hdr3);
+	trans.active = LIBNVRAM_ACTIVE_A;
+	libnvram_update_transaction(&trans, LIBNVRAM_OPERATION_WRITE_B, &hdr3);
 	if (memcmp(&trans.section_a.hdr, &hdr1, sizeof(hdr1))) {
 		printf("section_a hdr wrong\n");
 		goto error_exit;
@@ -422,7 +422,7 @@ static int test_nvram_update_transaction()
 		printf("section_b hdr wrong\n");
 		goto error_exit;
 	}
-	if (trans.active != NVRAM_ACTIVE_B) {
+	if (trans.active != LIBNVRAM_ACTIVE_B) {
 		printf("wrong active\n");
 		goto error_exit;
 	}
@@ -430,8 +430,8 @@ static int test_nvram_update_transaction()
 	memset(&trans, 0, sizeof(trans));
 	memcpy(&trans.section_a.hdr, &hdr2, sizeof(hdr2));
 	memcpy(&trans.section_b.hdr, &hdr1, sizeof(hdr1));
-	trans.active = NVRAM_ACTIVE_B;
-	nvram_update_transaction(&trans, NVRAM_OPERATION_WRITE_A, &hdr3);
+	trans.active = LIBNVRAM_ACTIVE_B;
+	libnvram_update_transaction(&trans, LIBNVRAM_OPERATION_WRITE_A, &hdr3);
 	if (memcmp(&trans.section_a.hdr, &hdr3, sizeof(hdr3))) {
 		printf("section_a hdr wrong\n");
 		goto error_exit;
@@ -440,7 +440,7 @@ static int test_nvram_update_transaction()
 		printf("section_b hdr wrong\n");
 		goto error_exit;
 	}
-	if (trans.active != NVRAM_ACTIVE_A) {
+	if (trans.active != LIBNVRAM_ACTIVE_A) {
 		printf("wrong active\n");
 		goto error_exit;
 	}
@@ -448,8 +448,8 @@ static int test_nvram_update_transaction()
 	memset(&trans, 0, sizeof(trans));
 	memcpy(&trans.section_a.hdr, &hdr1, sizeof(hdr1));
 	memcpy(&trans.section_b.hdr, &hdr2, sizeof(hdr2));
-	trans.active = NVRAM_ACTIVE_A;
-	nvram_update_transaction(&trans, NVRAM_OPERATION_WRITE_B | NVRAM_OPERATION_COUNTER_RESET, &hdr3);
+	trans.active = LIBNVRAM_ACTIVE_A;
+	libnvram_update_transaction(&trans, LIBNVRAM_OPERATION_WRITE_B | LIBNVRAM_OPERATION_COUNTER_RESET, &hdr3);
 	if (memcmp(&trans.section_a.hdr, &hdr3, sizeof(hdr3))) {
 		printf("section_a hdr wrong\n");
 		goto error_exit;
@@ -458,7 +458,7 @@ static int test_nvram_update_transaction()
 		printf("section_b hdr wrong\n");
 		goto error_exit;
 	}
-	if (trans.active != (NVRAM_ACTIVE_A | NVRAM_ACTIVE_B)) {
+	if (trans.active != (LIBNVRAM_ACTIVE_A | LIBNVRAM_ACTIVE_B)) {
 		printf("wrong active\n");
 		goto error_exit;
 	}
@@ -469,13 +469,13 @@ error_exit:
 }
 
 struct test test_array[] = {
-		ADD_TEST(test_nvram_init_transaction),
-		ADD_TEST(test_nvram_init_transaction_corrupt_header),
-		ADD_TEST(test_nvram_init_transaction_corrupt_data),
-		ADD_TEST(test_nvram_next_transaction),
-		ADD_TEST(test_nvram_next_transaction_new),
-		ADD_TEST(test_nvram_next_transaction_counter_reset),
-		ADD_TEST(test_nvram_update_transaction),
+		ADD_TEST(test_libnvram_init_transaction),
+		ADD_TEST(test_libnvram_init_transaction_corrupt_header),
+		ADD_TEST(test_libnvram_init_transaction_corrupt_data),
+		ADD_TEST(test_libnvram_next_transaction),
+		ADD_TEST(test_libnvram_next_transaction_new),
+		ADD_TEST(test_libnvram_next_transaction_counter_reset),
+		ADD_TEST(test_libnvram_update_transaction),
 		{NULL, NULL},
 };
 

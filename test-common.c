@@ -15,7 +15,7 @@ int keycmp(const uint8_t* key1, uint32_t key1_len, const uint8_t* key2, uint32_t
 }
 
 // return 0 for equal
-int entrycmp(const struct nvram_entry* entry1, const struct nvram_entry* entry2)
+int entrycmp(const struct libnvram_entry* entry1, const struct libnvram_entry* entry2)
 {
 	if (!keycmp(entry1->key, entry1->key_len, entry2->key, entry2->key_len)) {
 		return keycmp(entry1->value, entry1->value_len, entry2->value, entry2->value_len);
@@ -23,7 +23,7 @@ int entrycmp(const struct nvram_entry* entry1, const struct nvram_entry* entry2)
 	return 1;
 }
 
-void fill_entry(struct nvram_entry* entry, const char* key, const char* value)
+void fill_entry(struct libnvram_entry* entry, const char* key, const char* value)
 {
 	entry->key = (uint8_t*) key;
 	entry->key_len = strlen(key);

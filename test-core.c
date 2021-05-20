@@ -7,17 +7,17 @@
 #include "libnvram.h"
 #include "test-common.h"
 
-static int test_nvram_header_size()
+static int test_libnvram_header_size()
 {
-	if (nvram_header_len() != 16) {
-		printf("nvram_header_len != 16\n");
+	if (libnvram_header_len() != 16) {
+		printf("libnvram_header_len != 16\n");
 		return 1;
 	}
 
 	return 0;
 }
 
-static int test_nvram_validate_header()
+static int test_libnvram_validate_header()
 {
 	const uint8_t test_section[] = {
 		0x10, 0x00, 0x00, 0x00,
@@ -26,10 +26,10 @@ static int test_nvram_validate_header()
 		0x77, 0xbe, 0x15, 0x63,
 	};
 
-	struct nvram_header hdr;
-	int r = nvram_validate_header(test_section, sizeof(test_section), &hdr);
+	struct libnvram_header hdr;
+	int r = libnvram_validate_header(test_section, sizeof(test_section), &hdr);
 	if (r) {
-		printf("nvram_validate_header: %s\n", strerror(-r));
+		printf("libnvram_validate_header: %s\n", strerror(-r));
 		return 1;
 	}
 
@@ -56,7 +56,7 @@ static int test_nvram_validate_header()
 	return 0;
 }
 
-static int test_nvram_validate_header_corrupt()
+static int test_libnvram_validate_header_corrupt()
 {
 	const uint8_t test_section[] = {
 		0x10, 0x00, 0x00, 0x00,
@@ -65,19 +65,19 @@ static int test_nvram_validate_header_corrupt()
 		0x77, 0xbe, 0x15, 0x64,
 	};
 
-	struct nvram_header hdr;
-	int r = nvram_validate_header(test_section, sizeof(test_section), &hdr);
+	struct libnvram_header hdr;
+	int r = libnvram_validate_header(test_section, sizeof(test_section), &hdr);
 	if (!r) {
-		printf("nvram_validate_header no error\n");
+		printf("libnvram_validate_header no error\n");
 		return 1;
 	}
 
 	return 0;
 }
 
-static int test_nvram_validate_data()
+static int test_libnvram_validate_data()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	hdr.data_len = 39;
 	hdr.data_crc32 = 0x6c9dd729;
@@ -90,18 +90,18 @@ static int test_nvram_validate_data()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
+	int r = libnvram_validate_data(test_section, sizeof(test_section), &hdr);
 	if (r) {
-		printf("nvram_validate_data: %s\n", strerror(-r));
+		printf("libnvram_validate_data: %s\n", strerror(-r));
 		return 1;
 	}
 
 	return 0;
 }
 
-static int test_nvram_validate_data_crc_corrupt()
+static int test_libnvram_validate_data_crc_corrupt()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	hdr.data_len = 39;
 	hdr.data_crc32 = 0x6c9dd729;
@@ -114,18 +114,18 @@ static int test_nvram_validate_data_crc_corrupt()
 			0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x67
 	};
 
-	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
+	int r = libnvram_validate_data(test_section, sizeof(test_section), &hdr);
 	if (!r) {
-		printf("nvram_validate_data no error\n");
+		printf("libnvram_validate_data no error\n");
 		return 1;
 	}
 
 	return 0;
 }
 
-static int test_nvram_validate_data_entry_corrupt()
+static int test_libnvram_validate_data_entry_corrupt()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	hdr.data_len = 39;
 	hdr.data_crc32 = 0x5cc70915;
@@ -138,18 +138,18 @@ static int test_nvram_validate_data_entry_corrupt()
 			0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	int r = nvram_validate_data(test_section, sizeof(test_section), &hdr);
+	int r = libnvram_validate_data(test_section, sizeof(test_section), &hdr);
 	if (!r) {
-		printf("nvram_validate_data no error\n");
+		printf("libnvram_validate_data no error\n");
 		return 1;
 	}
 
 	return 0;
 }
 
-static int test_nvram_deserialize()
+static int test_libnvram_deserialize()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	hdr.data_len = 39;
 	hdr.data_crc32 = 0x6c9dd729;
@@ -162,15 +162,15 @@ static int test_nvram_deserialize()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	struct nvram_entry entry1;
+	struct libnvram_entry entry1;
 	fill_entry(&entry1, "TEST1", "abcdefghij");
-	struct nvram_entry entry2;
+	struct libnvram_entry entry2;
 	fill_entry(&entry2, "TEST2", "def");
 
-	struct nvram_list *list = NULL;
-	int r = nvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
+	struct libnvram_list *list = NULL;
+	int r = libnvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
 	if (r) {
-		printf("nvram_section_deserialize failed: %s\n", strerror(-r));
+		printf("libnvram_section_deserialize failed: %s\n", strerror(-r));
 		goto error_exit;
 	}
 
@@ -189,17 +189,17 @@ static int test_nvram_deserialize()
 		goto error_exit;
 	}
 
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 0;
 
 error_exit:
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 1;
 }
 
-static int test_nvram_deserialize_single()
+static int test_libnvram_deserialize_single()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 1;
 	hdr.data_len = 25;
 	hdr.data_crc32 = 0x6c9dd729;
@@ -211,7 +211,7 @@ static int test_nvram_deserialize_single()
 		0x00
 	};
 
-	struct nvram_entry entry1;
+	struct libnvram_entry entry1;
 	const char* key = "TEST1";
 	const char* value = "abcdefghij";
 	entry1.key = (uint8_t*) key;
@@ -219,10 +219,10 @@ static int test_nvram_deserialize_single()
 	entry1.value = (uint8_t*) value;
 	entry1.value_len = strlen(value) + 1;
 
-	struct nvram_list *list = NULL;
-	int r = nvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
+	struct libnvram_list *list = NULL;
+	int r = libnvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
 	if (r) {
-		printf("nvram_section_deserialize failed [%d]: %s\n", -r, strerror(-r));
+		printf("libnvram_section_deserialize failed [%d]: %s\n", -r, strerror(-r));
 		goto error_exit;
 	}
 
@@ -236,31 +236,31 @@ static int test_nvram_deserialize_single()
 		goto error_exit;
 	}
 
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 0;
 
 error_exit:
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 1;
 }
 
-static int test_nvram_deserialize_empty_data()
+static int test_libnvram_deserialize_empty_data()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	hdr.data_len = 0;
 	hdr.data_crc32 = 0x00000000;
 	hdr.header_crc32 = 0x890d9bbe;
 
-	struct nvram_list *list = NULL;
+	struct libnvram_list *list = NULL;
 	const uint8_t test_section[] = {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00
 	};
 
-	int r = nvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
+	int r = libnvram_deserialize(&list, test_section, sizeof(test_section), &hdr);
 	if (r) {
-		printf("nvram_section_deserialize failed: %s\n", strerror(-r));
+		printf("libnvram_section_deserialize failed: %s\n", strerror(-r));
 		goto error_exit;
 	}
 
@@ -272,40 +272,40 @@ static int test_nvram_deserialize_empty_data()
 	return 0;
 
 error_exit:
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 1;
 }
 
-static int test_nvram_serialize_size()
+static int test_libnvram_serialize_size()
 {
-	struct nvram_entry entry1;
+	struct libnvram_entry entry1;
 	fill_entry(&entry1, "TEST1", "abcdefghij");
-	struct nvram_list *list = NULL;
-	int r = nvram_list_set(&list, &entry1);
+	struct libnvram_list *list = NULL;
+	int r = libnvram_list_set(&list, &entry1);
 	if (r) {
-		printf("nvram_list_set: %s\n", strerror(-r));
+		printf("libnvram_list_set: %s\n", strerror(-r));
 		goto error_exit;
 	}
 
-	uint32_t size = nvram_serialize_size(list);
+	uint32_t size = libnvram_serialize_size(list);
 	if (size != 39) {
 		printf("returned %u != 39\n", size);
 		goto error_exit;
 	}
 
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 
 	return 0;
 
 error_exit:
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 1;
 }
 
-static int test_nvram_serialize_size_empty_data()
+static int test_libnvram_serialize_size_empty_data()
 {
-	struct nvram_list *list = NULL;
-	uint32_t size = nvram_serialize_size(list);
+	struct libnvram_list *list = NULL;
+	uint32_t size = libnvram_serialize_size(list);
 	if (size != 16) {
 		printf("returned %u != 16\n", size);
 		goto error_exit;
@@ -317,9 +317,9 @@ error_exit:
 	return 1;
 }
 
-static int test_nvram_serialize()
+static int test_libnvram_serialize()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	//hdr.data_len = 39;
 	//hdr.data_crc32 = 0x6c9dd729;
@@ -335,28 +335,28 @@ static int test_nvram_serialize()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	struct nvram_entry entry1;
+	struct libnvram_entry entry1;
 	fill_entry(&entry1, "TEST1", "abcdefghij");
-	struct nvram_entry entry2;
+	struct libnvram_entry entry2;
 	fill_entry(&entry2, "TEST2", "def");
-	struct nvram_list *list = NULL;
-	int r = nvram_list_set(&list, &entry1);
+	struct libnvram_list *list = NULL;
+	int r = libnvram_list_set(&list, &entry1);
 	if (r) {
-		printf("nvram_list_set failed: %s\n", strerror(-r));
+		printf("libnvram_list_set failed: %s\n", strerror(-r));
 		goto error_exit;
 	}
-	r = nvram_list_set(&list, &entry2);
+	r = libnvram_list_set(&list, &entry2);
 	if (r) {
-		printf("nvram_list_set failed: %s\n", strerror(-r));
+		printf("libnvram_list_set failed: %s\n", strerror(-r));
 		goto error_exit;
 	}
 
 	uint32_t size = sizeof(test_section);
 	uint8_t buf[sizeof(test_section)];
 
-	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
+	uint32_t bytes = libnvram_serialize(list, buf, size, &hdr);
 	if (bytes != size) {
-		printf("nvram_serialize: returned %u != %u\n", bytes, size);
+		printf("libnvram_serialize: returned %u != %u\n", bytes, size);
 		goto error_exit;
 	}
 
@@ -385,17 +385,17 @@ static int test_nvram_serialize()
 		goto error_exit;
 	}
 
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 0;
 
 error_exit:
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 1;
 }
 
-static int test_nvram_serialize_empty_data()
+static int test_libnvram_serialize_empty_data()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	//hdr.data_len = 0;
 	//hdr.data_crc32 = 0x00000000;
@@ -408,14 +408,14 @@ static int test_nvram_serialize_empty_data()
 		0xbe, 0x9b, 0x0d, 0x89,
 	};
 
-	struct nvram_list *list = NULL;
+	struct libnvram_list *list = NULL;
 
 	uint32_t size = sizeof(test_section);
 	uint8_t buf[size];
 
-	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
+	uint32_t bytes = libnvram_serialize(list, buf, size, &hdr);
 	if (bytes != size) {
-		printf("nvram_serialize: returned %u != %u\n", bytes, size);
+		printf("libnvram_serialize: returned %u != %u\n", bytes, size);
 		goto error_exit;
 	}
 
@@ -444,17 +444,17 @@ static int test_nvram_serialize_empty_data()
 		goto error_exit;
 	}
 
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 0;
 
 error_exit:
-	destroy_nvram_list(&list);
+	destroy_libnvram_list(&list);
 	return 1;
 }
 
 static int test_iterator()
 {
-	struct nvram_header hdr;
+	struct libnvram_header hdr;
 	hdr.counter = 16;
 	hdr.data_len = 39;
 	hdr.data_crc32 = 0x6c9dd729;
@@ -467,40 +467,40 @@ static int test_iterator()
 		0x45, 0x53, 0x54, 0x32, 0x64, 0x65, 0x66
 	};
 
-	uint8_t *begin = nvram_it_begin(test_section, sizeof(test_section), &hdr);
+	uint8_t *begin = libnvram_it_begin(test_section, sizeof(test_section), &hdr);
 	if (begin != test_section) {
-		printf("nvram_it_begin not pointing to start of data\n");
+		printf("libnvram_it_begin not pointing to start of data\n");
 		goto error_exit;
 	}
 
-	uint8_t *end = nvram_it_end(test_section, sizeof(test_section), &hdr);
+	uint8_t *end = libnvram_it_end(test_section, sizeof(test_section), &hdr);
 	if (end != test_section + sizeof(test_section)) {
-		printf("nvram_it_end not pointing to end of data\n");
+		printf("libnvram_it_end not pointing to end of data\n");
 		goto error_exit;
 	}
 
 	uint8_t* it = begin;
-	struct nvram_entry entry1;
+	struct libnvram_entry entry1;
 	fill_entry(&entry1, "TEST1", "abcdefghij");
-	struct nvram_entry entry;
-	nvram_it_deref(it, &entry);
+	struct libnvram_entry entry;
+	libnvram_it_deref(it, &entry);
 	if (entrycmp(&entry, &entry1)) {
-		printf("nvram_it_deref: 1st entry wrong\n");
+		printf("libnvram_it_deref: 1st entry wrong\n");
 		goto error_exit;
 	}
 
-	it = nvram_it_next(it);
-	struct nvram_entry entry2;
+	it = libnvram_it_next(it);
+	struct libnvram_entry entry2;
 	fill_entry(&entry2, "TEST2", "def");
-	nvram_it_deref(it, &entry);
+	libnvram_it_deref(it, &entry);
 	if (entrycmp(&entry, &entry2)) {
-		printf("nvram_it_deref: 2nd entry wrong\n");
+		printf("libnvram_it_deref: 2nd entry wrong\n");
 		goto error_exit;
 	}
 
-	it = nvram_it_next(it);
+	it = libnvram_it_next(it);
 	if (it != end) {
-		printf("nvram_it_next: did not end\n");
+		printf("libnvram_it_next: did not end\n");
 		goto error_exit;
 	}
 
@@ -511,19 +511,19 @@ error_exit:
 }
 
 struct test test_array[] = {
-		ADD_TEST(test_nvram_header_size),
-		ADD_TEST(test_nvram_validate_header),
-		ADD_TEST(test_nvram_validate_header_corrupt),
-		ADD_TEST(test_nvram_validate_data),
-		ADD_TEST(test_nvram_validate_data_crc_corrupt),
-		ADD_TEST(test_nvram_validate_data_entry_corrupt),
-		ADD_TEST(test_nvram_deserialize),
-		ADD_TEST(test_nvram_deserialize_single),
-		ADD_TEST(test_nvram_deserialize_empty_data),
-		ADD_TEST(test_nvram_serialize_size),
-		ADD_TEST(test_nvram_serialize_size_empty_data),
-		ADD_TEST(test_nvram_serialize),
-		ADD_TEST(test_nvram_serialize_empty_data),
+		ADD_TEST(test_libnvram_header_size),
+		ADD_TEST(test_libnvram_validate_header),
+		ADD_TEST(test_libnvram_validate_header_corrupt),
+		ADD_TEST(test_libnvram_validate_data),
+		ADD_TEST(test_libnvram_validate_data_crc_corrupt),
+		ADD_TEST(test_libnvram_validate_data_entry_corrupt),
+		ADD_TEST(test_libnvram_deserialize),
+		ADD_TEST(test_libnvram_deserialize_single),
+		ADD_TEST(test_libnvram_deserialize_empty_data),
+		ADD_TEST(test_libnvram_serialize_size),
+		ADD_TEST(test_libnvram_serialize_size_empty_data),
+		ADD_TEST(test_libnvram_serialize),
+		ADD_TEST(test_libnvram_serialize_empty_data),
 		ADD_TEST(test_iterator),
 		{NULL, NULL},
 };
