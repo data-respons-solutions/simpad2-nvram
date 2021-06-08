@@ -13,7 +13,6 @@
 #endif
 #include <stdlib.h>
 #include <stdint.h>
-#include <assert.h>
 #include "libnvram.h"
 #include "crc32.h"
 
@@ -193,14 +192,14 @@ static uint32_t u32tole(uint32_t host)
 #define HEADER_HDR_CRC32_OFFSET	20
 #define HEADER_HDR_CRC32_SIZE	4
 
-static_assert(HEADER_SIZE == sizeof(struct libnvram_header), "libnvram_header size unexpected");
-static_assert(HEADER_MAGIC_SIZE == member_size(struct libnvram_header, magic), "libnvram_header.magic size unexpected");
-static_assert(HEADER_USER_SIZE == member_size(struct libnvram_header, user), "libnvram_header.user size unexpected");
-static_assert(HEADER_TYPE_SIZE == member_size(struct libnvram_header, type), "libnvram_header.type size unexpected");
-static_assert(HEADER_RSVD_SIZE == member_size(struct libnvram_header, reserved), "libnvram_header.reserved size unexpected");
-static_assert(HEADER_LEN_SIZE == member_size(struct libnvram_header, len), "libnvram_header.len size unexpected");
-static_assert(HEADER_CRC32_SIZE == member_size(struct libnvram_header, crc32), "libnvram_header.crc32 size unexpected");
-static_assert(HEADER_HDR_CRC32_SIZE == member_size(struct libnvram_header, hdr_crc32), "libnvram_header.hdr_crc32 size unexpected");
+_Static_assert(HEADER_SIZE == sizeof(struct libnvram_header), "libnvram_header size unexpected");
+_Static_assert(HEADER_MAGIC_SIZE == member_size(struct libnvram_header, magic), "libnvram_header.magic size unexpected");
+_Static_assert(HEADER_USER_SIZE == member_size(struct libnvram_header, user), "libnvram_header.user size unexpected");
+_Static_assert(HEADER_TYPE_SIZE == member_size(struct libnvram_header, type), "libnvram_header.type size unexpected");
+_Static_assert(HEADER_RSVD_SIZE == member_size(struct libnvram_header, reserved), "libnvram_header.reserved size unexpected");
+_Static_assert(HEADER_LEN_SIZE == member_size(struct libnvram_header, len), "libnvram_header.len size unexpected");
+_Static_assert(HEADER_CRC32_SIZE == member_size(struct libnvram_header, crc32), "libnvram_header.crc32 size unexpected");
+_Static_assert(HEADER_HDR_CRC32_SIZE == member_size(struct libnvram_header, hdr_crc32), "libnvram_header.hdr_crc32 size unexpected");
 
 #define LIST_HEADER_SIZE		8
 #define LIST_MIN_SIZE			10 // Header + key/value of length 1 each
@@ -210,8 +209,8 @@ static_assert(HEADER_HDR_CRC32_SIZE == member_size(struct libnvram_header, hdr_c
 #define LIST_VALUE_LEN_SIZE		4
 #define	LIST_DATA_OFFSET		8
 
-static_assert(LIST_KEY_LEN_SIZE == member_size(struct libnvram_entry, key_len), "libnvram_entry.key_len size unexpected");
-static_assert(LIST_VALUE_LEN_SIZE == member_size(struct libnvram_entry, value_len), "libnvram_entry.value_len size unexpected");
+_Static_assert(LIST_KEY_LEN_SIZE == member_size(struct libnvram_entry, key_len), "libnvram_entry.key_len size unexpected");
+_Static_assert(LIST_VALUE_LEN_SIZE == member_size(struct libnvram_entry, value_len), "libnvram_entry.value_len size unexpected");
 
 uint32_t libnvram_header_len(void)
 {
