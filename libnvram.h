@@ -144,8 +144,10 @@ int libnvram_deserialize(struct libnvram_list** list, const uint8_t* data, uint3
 /*
  * Returns size needed for serializing list.
  * Useful for allocating buffer for libnvram_serialize().
+ *
+ * Unsupported types will return 0.
  */
-uint32_t libnvram_serialize_size(const struct libnvram_list* list);
+uint32_t libnvram_serialize_size(const struct libnvram_list* list, enum libnvram_type type);
 
 /*
  * Create serialized data buffer from list.

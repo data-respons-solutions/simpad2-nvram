@@ -377,7 +377,7 @@ static int test_libnvram_serialize_size()
 	}
 
 	const uint32_t required = 47;
-	uint32_t size = libnvram_serialize_size(list);
+	uint32_t size = libnvram_serialize_size(list, LIBNVRAM_TYPE_LIST);
 	if (size != required) {
 		printf("returned %u != %u\n", size, required);
 		goto error_exit;
@@ -396,7 +396,7 @@ static int test_libnvram_serialize_size_empty_data()
 {
 	struct libnvram_list *list = NULL;
 	const uint32_t required = 24;
-	uint32_t size = libnvram_serialize_size(list);
+	uint32_t size = libnvram_serialize_size(list, LIBNVRAM_TYPE_LIST);
 	if (size != required) {
 		printf("returned %u != %u\n", size, required);
 		goto error_exit;

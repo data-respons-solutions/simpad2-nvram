@@ -330,8 +330,12 @@ int libnvram_deserialize(struct libnvram_list** list, const uint8_t* data, uint3
 	return r;
 }
 
-uint32_t libnvram_serialize_size(const struct libnvram_list* list)
+uint32_t libnvram_serialize_size(const struct libnvram_list* list, enum libnvram_type type)
 {
+	if (type != LIBNVRAM_TYPE_LIST) {
+		return 0;
+	}
+
 	uint32_t size = HEADER_SIZE;
 	if (list) {
 		for (struct libnvram_list* cur = (struct libnvram_list*) list; cur != NULL; cur = cur->next) {
@@ -374,7 +378,7 @@ uint32_t libnvram_serialize(const struct libnvram_list* list, uint8_t* data, uin
 		return 0;
 	}
 
-	const uint32_t required_size = libnvram_serialize_size(list);
+	const uint32_t required_size = libnvram_serialize_size(list, hdr->type);
 	if (len < required_size) {
 		return 0;
 	}
