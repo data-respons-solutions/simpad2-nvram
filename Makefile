@@ -6,6 +6,7 @@ CFLAGS += -Wextra
 CFLAGS += -Werror
 CFLAGS += -std=gnu11
 CFLAGS += -pedantic
+CLANG_TIDY ?= yes
 
 all: libnvram.a
 
@@ -25,8 +26,10 @@ test-crc32: test-crc32.o crc32.o test-common.o
 	$(CC) -o $@ $^ $(LDFLAGS)
    
 .c.o:
+ifeq ($(CLANG_TIDY),yes)
 	clang-tidy $< -header-filter=.* \
 		-checks=-*,clang-analyzer-*,bugprone-*,cppcoreguidelines-*,portability-*,readability-* -- $<
+endif
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
