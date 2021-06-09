@@ -225,7 +225,7 @@ static int append_hex(char* str, size_t size, uint8_t* data, uint32_t len)
 	return bytes;
 }
 
-static int print_entry(const struct nvram_entry* entry, enum print_options opts)
+static int print_entry(const struct libnvram_entry* entry, enum print_options opts)
 {
 	if (entry->key_len > INT_MAX || entry->value_len > INT_MAX) {
 		return -EINVAL;
@@ -304,10 +304,10 @@ exit:
 
 
 // return 0 for OK or negative errno for error
-static int print_list_entry(const char* list_name, const struct nvram_list* list, const char* key)
+static int print_list_entry(const char* list_name, const struct libnvram_list* list, const char* key)
 {
 	pr_dbg("getting key from %s: %s\n", list_name, key);
-	struct nvram_entry *entry = nvram_list_get(list, (uint8_t*) key, strlen(key) + 1);
+	struct libnvram_entry *entry = libnvram_list_get(list, (uint8_t*) key, strlen(key) + 1);
 	if (!entry) {
 		return -ENOENT;
 	}
@@ -315,10 +315,10 @@ static int print_list_entry(const char* list_name, const struct nvram_list* list
 	return print_entry(entry, PRINT_VALUE);
 }
 
-static void print_list(const char* list_name, const struct nvram_list* list)
+static void print_list(const char* list_name, const struct libnvram_list* list)
 {
 	pr_dbg("listing %s\n", list_name);
-	for (struct nvram_list *cur = (struct nvram_list*) list; cur; cur = cur->next) {
+	for (struct libnvram_list *cur = (struct libnvram_list*) list; cur; cur = cur->next) {
 		print_entry(cur->entry, PRINT_KEY_AND_VALUE);
 	}
 }
@@ -333,23 +333,23 @@ static int keycmp(const uint8_t* key1, uint32_t key1_len, const uint8_t* key2, u
 }
 
 // return 0 if already exists, 1 if added, negate errno for error
-static int add_list_entry(const char* list_name, struct nvram_list** list, const char* key, const char* value)
+static int add_list_entry(const char* list_name, struct libnvram_list** list, const char* key, const char* value)
 {
 	const size_t key_len = strlen(key) + 1;
 	const size_t value_len = strlen(value) + 1;
 
 	pr_dbg("setting: %s: %s=%s\n", list_name, key, value);
-	struct nvram_entry *entry = nvram_list_get(*list, (uint8_t*) key, key_len);
+	struct libnvram_entry *entry = libnvram_list_get(*list, (uint8_t*) key, key_len);
 	if (entry && !keycmp(entry->value, entry->value_len, (uint8_t*) value, value_len)) {
 		return 0;
 	}
-	struct nvram_entry new;
+	struct libnvram_entry new;
 	new.key = (uint8_t*) key;
 	new.key_len = key_len;
 	new.value = (uint8_t*) value;
 	new.value_len = value_len;
 
-	int r = nvram_list_set(list, &new);
+	int r = libnvram_list_set(list, &new);
 	if (r) {
 		pr_err("failed setting to %s list [%d]: %s\n", list_name, -r, strerror(-r));
 		return r;
@@ -450,9 +450,9 @@ int main(int argc, char** argv)
 	}
 
 	struct nvram *nvram_system = NULL;
-	struct nvram_list *list_system = NULL;
+	struct libnvram_list *list_system = NULL;
 	struct nvram *nvram_user = NULL;
-	struct nvram_list *list_user = NULL;
+	struct libnvram_list *list_user = NULL;
 
 	r = acquire_lockfile(NVRAM_LOCKFILE, &FDLOCK);
 	if (r) {
@@ -513,7 +513,7 @@ int main(int argc, char** argv)
 		break;
 	case OP_DEL:
 		pr_dbg("deleting %s: %s\n", opts.system_mode ? "system" : "user", opts.key);
-		if(nvram_list_remove(opts.system_mode ? &list_system : &list_user, (uint8_t*) opts.key, strlen(opts.key) + 1)) {
+		if(libnvram_list_remove(opts.system_mode ? &list_system : &list_user, (uint8_t*) opts.key, strlen(opts.key) + 1)) {
 			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? list_system : list_user);
 			if (r) {
 				goto exit;
@@ -527,10 +527,10 @@ int main(int argc, char** argv)
 exit:
 	release_lockfile(NVRAM_LOCKFILE, FDLOCK);
 	if (list_system) {
-		destroy_nvram_list(&list_system);
+		destroy_libnvram_list(&list_system);
 	}
 	if (list_user) {
-		destroy_nvram_list(&list_user);
+		destroy_libnvram_list(&list_user);
 	}
 	nvram_close(&nvram_system);
 	nvram_close(&nvram_user);

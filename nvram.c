@@ -10,17 +10,17 @@
 #include "libnvram/libnvram.h"
 
 struct nvram {
-	struct nvram_transaction trans;
+	struct libnvram_transaction trans;
 	struct nvram_device *dev_a;
 	struct nvram_device *dev_b;
 };
 
-static const char* nvram_active_str(enum nvram_active active)
+static const char* nvram_active_str(enum libnvram_active active)
 {
 	switch (active) {
-	case NVRAM_ACTIVE_A:
+	case LIBNVRAM_ACTIVE_A:
 		return "A";
-	case NVRAM_ACTIVE_B:
+	case LIBNVRAM_ACTIVE_B:
 		return "B";
 	default:
 		return "NONE";
@@ -71,7 +71,7 @@ error_exit:
 	return r;
 }
 
-static int init_and_read(struct nvram_device** dev, const char* section, enum nvram_active name, uint8_t** buf, size_t* size)
+static int init_and_read(struct nvram_device** dev, const char* section, enum libnvram_active name, uint8_t** buf, size_t* size)
 {
 	pr_dbg("%s: initializing: %s\n", nvram_active_str(name), section);
 	int r = nvram_interface_init(dev, section);
@@ -88,7 +88,7 @@ static int init_and_read(struct nvram_device** dev, const char* section, enum nv
 	return 0;
 }
 
-int nvram_init(struct nvram** nvram, struct nvram_list** list, const char* section_a, const char* section_b)
+int nvram_init(struct nvram** nvram, struct libnvram_list** list, const char* section_a, const char* section_b)
 {
 	uint8_t *buf_a = NULL;
 	size_t size_a = 0;
@@ -102,27 +102,27 @@ int nvram_init(struct nvram** nvram, struct nvram_list** list, const char* secti
 
 	int r = 0;
 	if (section_a && strlen(section_a) > 0) {
-		r = init_and_read(&pnvram->dev_a, section_a, NVRAM_ACTIVE_A, &buf_a, &size_a);
+		r = init_and_read(&pnvram->dev_a, section_a, LIBNVRAM_ACTIVE_A, &buf_a, &size_a);
 		if (r) {
 			goto exit;
 		}
 	}
 	if (section_b && strlen(section_b) > 0) {
-		r = init_and_read(&pnvram->dev_b, section_b, NVRAM_ACTIVE_B, &buf_b, &size_b);
+		r = init_and_read(&pnvram->dev_b, section_b, LIBNVRAM_ACTIVE_B, &buf_b, &size_b);
 		if (r) {
 			goto exit;
 		}
 	}
 
-	nvram_init_transaction(&pnvram->trans, buf_a, size_a, buf_b, size_b);
+	libnvram_init_transaction(&pnvram->trans, buf_a, size_a, buf_b, size_b);
 	pr_dbg("%s: active\n", nvram_active_str(pnvram->trans.active));
 	r = 0;
-	if ((pnvram->trans.active & NVRAM_ACTIVE_A) == NVRAM_ACTIVE_A) {
-		r = nvram_deserialize(list, buf_a + nvram_header_len(), size_a - nvram_header_len(), &pnvram->trans.section_a.hdr);
+	if ((pnvram->trans.active & LIBNVRAM_ACTIVE_A) == LIBNVRAM_ACTIVE_A) {
+		r = libnvram_deserialize(list, buf_a + libnvram_header_len(), size_a - libnvram_header_len(), &pnvram->trans.section_a.hdr);
 	}
 	else
-	if ((pnvram->trans.active & NVRAM_ACTIVE_B) == NVRAM_ACTIVE_B) {
-		r = nvram_deserialize(list, buf_b + nvram_header_len(), size_b - nvram_header_len(), &pnvram->trans.section_b.hdr);
+	if ((pnvram->trans.active & LIBNVRAM_ACTIVE_B) == LIBNVRAM_ACTIVE_B) {
+		r = libnvram_deserialize(list, buf_b + libnvram_header_len(), size_b - libnvram_header_len(), &pnvram->trans.section_b.hdr);
 	}
 
 	if (r) {
@@ -164,11 +164,11 @@ static int _write(struct nvram_device* dev, const uint8_t* buf, uint32_t size)
 	return r;
 }
 
-int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
+int nvram_commit(struct nvram* nvram, const struct libnvram_list* list)
 {
 	uint8_t *buf = NULL;
 	int r = 0;
-	uint32_t size = nvram_serialize_size(list);
+	uint32_t size = libnvram_serialize_size(list, LIBNVRAM_TYPE_LIST);
 
 	buf = (uint8_t*) malloc(size);
 	if (!buf) {
@@ -177,9 +177,10 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 		goto exit;
 	}
 
-	struct nvram_header hdr;
-	enum nvram_operation op = nvram_next_transaction(&nvram->trans, &hdr);
-	uint32_t bytes = nvram_serialize(list, buf, size, &hdr);
+	struct libnvram_header hdr;
+	hdr.type = LIBNVRAM_TYPE_LIST;
+	enum libnvram_operation op = libnvram_next_transaction(&nvram->trans, &hdr);
+	uint32_t bytes = libnvram_serialize(list, buf, size, &hdr);
 	if (!bytes) {
 		pr_err("failed serializing nvram data\n");
 		goto exit;
@@ -190,8 +191,8 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 		r = _write(nvram->dev_a ? nvram->dev_a : nvram->dev_b, buf, size);
 	}
 	else {
-		const int is_write_a = (op & NVRAM_OPERATION_WRITE_A) == NVRAM_OPERATION_WRITE_A;
-		const int is_counter_reset = (op & NVRAM_OPERATION_COUNTER_RESET) == NVRAM_OPERATION_COUNTER_RESET;
+		const int is_write_a = (op & LIBNVRAM_OPERATION_WRITE_A) == LIBNVRAM_OPERATION_WRITE_A;
+		const int is_counter_reset = (op & LIBNVRAM_OPERATION_COUNTER_RESET) == LIBNVRAM_OPERATION_COUNTER_RESET;
 		// first write
 		r = _write(is_write_a ? nvram->dev_a : nvram->dev_b, buf, size);
 		if (!r && is_counter_reset) {
@@ -203,7 +204,7 @@ int nvram_commit(struct nvram* nvram, const struct nvram_list* list)
 		goto exit;
 	}
 
-	nvram_update_transaction(&nvram->trans, op, &hdr);
+	libnvram_update_transaction(&nvram->trans, op, &hdr);
 
 	pr_dbg("%s: active\n", nvram_active_str(nvram->trans.active));
 
