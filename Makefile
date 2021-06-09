@@ -49,7 +49,7 @@ nvram : $(OBJS)
 
 .PHONY: libnvram/libnvram.a
 libnvram/libnvram.a:
-	make -C libnvram
+	make -C libnvram CLANG_TIDY=no
 
 install:
 	install -m 0755 -D nvram $(INSTALL_PATH)/
