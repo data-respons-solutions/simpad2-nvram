@@ -16,6 +16,15 @@
 #include "libnvram.h"
 #include "crc32.h"
 
+uint32_t libnvram_list_size(const struct libnvram_list* list)
+{
+	uint32_t size = 0;
+	for (struct libnvram_list* cur = (struct libnvram_list*) list; cur; cur = cur->next) {
+		size++;
+	}
+	return size;
+}
+
 /*
  * Create nvram entry from key and value.
 

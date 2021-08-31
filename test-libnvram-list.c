@@ -7,6 +7,63 @@
 #include "libnvram.h"
 #include "test-common.h"
 
+static int test_libnvram_list_size_0()
+{
+	struct libnvram_list *list = NULL;
+
+	int r = 1;
+
+	if (libnvram_list_size(list) != 0)
+		goto error_exit;
+
+	r = 0;
+error_exit:
+	destroy_libnvram_list(&list);
+	return r;
+}
+
+static int test_libnvram_list_size_1()
+{
+	struct libnvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct libnvram_list *list = NULL;
+
+	int r = 1;
+
+	libnvram_list_set(&list, &entry1);
+	if (libnvram_list_size(list) != 1)
+		goto error_exit;
+
+	r = 0;
+error_exit:
+	destroy_libnvram_list(&list);
+	return r;
+}
+
+static int test_libnvram_list_size_3()
+{
+	struct libnvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct libnvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
+	struct libnvram_entry entry3;
+	fill_entry(&entry3, "TEST3", "ghi");
+	struct libnvram_list *list = NULL;
+
+	int r = 1;
+
+	libnvram_list_set(&list, &entry1);
+	libnvram_list_set(&list, &entry2);
+	libnvram_list_set(&list, &entry3);
+	if (libnvram_list_size(list) != 3)
+		goto error_exit;
+
+	r = 0;
+error_exit:
+	destroy_libnvram_list(&list);
+	return r;
+}
+
 // validate entry in list at pos index
 // return 0 for equal
 static int check_libnvram_list_entry(const struct libnvram_list* list, int index, const struct libnvram_entry* entry)
@@ -240,6 +297,9 @@ error_exit:
 }
 
 struct test test_array[] = {
+		ADD_TEST(test_libnvram_list_size_0),
+		ADD_TEST(test_libnvram_list_size_1),
+		ADD_TEST(test_libnvram_list_size_3),
 		ADD_TEST(test_libnvram_list_set),
 		ADD_TEST(test_libnvram_list_overwrite_first),
 		ADD_TEST(test_libnvram_list_overwrite_second),

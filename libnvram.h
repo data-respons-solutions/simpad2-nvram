@@ -58,6 +58,11 @@ struct libnvram_list {
 };
 
 /*
+ * Size of list, number of entries.
+ */
+uint32_t libnvram_list_size(const struct libnvram_list* list);
+
+/*
  * Set entry. Entry with identical key will be overwritten.
  * Entry is copied to list.
  *
@@ -65,7 +70,6 @@ struct libnvram_list {
  *   0 for success
  *   negative libnvram_error for error
  */
-
 int libnvram_list_set(struct libnvram_list** list, const struct libnvram_entry* entry);
 
 /*
@@ -83,7 +87,6 @@ struct libnvram_entry* libnvram_list_get(const struct libnvram_list* list, const
  * @returns
  * 1 if removed, 0 if not found
  */
-
 int libnvram_list_remove(struct libnvram_list** list, const uint8_t* key, uint32_t key_len);
 
 /*
