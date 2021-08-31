@@ -1,52 +1,48 @@
-
-PREFIX ?= /usr/local
-
+BUILD ?= build
+CLANG_TIDY ?= no
 CFLAGS += -Wall
 CFLAGS += -Wextra
 CFLAGS += -Werror
 CFLAGS += -std=gnu11
 CFLAGS += -pedantic
-CLANG_TIDY ?= yes
 
-all: libnvram.a
+ifeq ($(abspath $(BUILD)),$(shell pwd)) 
+$(error "ERROR: Build dir can't be equal to source dir")
+endif
 
-libnvram.a: crc32.o libnvram.o 
+all: libnvram
+
+.PHONY: libnvram
+libnvram: $(BUILD)/libnvram.a
+
+$(BUILD)/libnvram.a: $(addprefix $(BUILD)/, crc32.o libnvram.o)
 	$(AR) rcs $@ $^
 
-test-core: test-core.o libnvram.a test-common.o
+$(BUILD)/test-core: $(addprefix $(BUILD)/, test-core.o libnvram.a test-common.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-test-libnvram-list: test-libnvram-list.o libnvram.a test-common.o
+$(BUILD)/test-libnvram-list: $(addprefix $(BUILD)/, test-libnvram-list.o libnvram.a test-common.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-test-transactional: test-transactional.o libnvram.a test-common.o
+$(BUILD)/test-transactional: $(addprefix $(BUILD)/, test-transactional.o libnvram.a test-common.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-test-crc32: test-crc32.o crc32.o test-common.o
+$(BUILD)/test-crc32: $(addprefix $(BUILD)/, test-crc32.o crc32.o test-common.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
    
-.c.o:
+$(BUILD)/%.o: %.c 
 ifeq ($(CLANG_TIDY),yes)
 	clang-tidy $< -header-filter=.* \
 		-checks=-*,clang-analyzer-*,bugprone-*,cppcoreguidelines-*,portability-*,readability-* -- $<
 endif
+	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
-test: test-core test-libnvram-list test-transactional test-crc32
+test: $(addprefix $(BUILD)/, test-core test-libnvram-list test-transactional test-crc32)
 	for test in $^; do \
 		echo "Running: $${test}"; \
 		if ! ./$${test}; then \
 			exit 1; \
 		fi \
 	done
-
-.PHONY: clean
-clean:
-	rm -f crc32.o
-	rm -f libnvram.o
-	rm -f libnvram.a
-	rm -f test-core test-core.o
-	rm -f test-libnvram-list test-libnvram-list.o
-	rm -f test-transactional test-transactional.o
-	rm -f test-crc32 test-crc32.o

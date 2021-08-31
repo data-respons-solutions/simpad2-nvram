@@ -1,6 +1,1 @@
-*.o
-*.a
-test-libnvram-list
-test-core
-test-crc32
-test-transactional
+build/
