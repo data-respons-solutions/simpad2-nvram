@@ -151,6 +151,27 @@ int libnvram_list_remove(struct libnvram_list** list, const uint8_t* key, uint32
 	return 0;
 }
 
+libnvram_list_it libnvram_list_begin(const struct libnvram_list* list)
+{
+	return (libnvram_list_it) list;
+}
+
+libnvram_list_it libnvram_list_end(const struct libnvram_list* list)
+{
+	(void) list;
+	return (libnvram_list_it) NULL;
+}
+
+libnvram_list_it libnvram_list_next(const libnvram_list_it it)
+{
+	return (libnvram_list_it) it->next;
+}
+
+struct libnvram_entry* libnvram_list_deref(const libnvram_list_it it)
+{
+	return it->entry;
+}
+
 void destroy_libnvram_list(struct libnvram_list** list)
 {
 	struct libnvram_list *cur = *list;

@@ -296,6 +296,50 @@ error_exit:
 	return r;
 }
 
+static int test_libnvram_list_iterate()
+{
+	struct libnvram_entry entry1;
+	fill_entry(&entry1, "TEST1", "abc");
+	struct libnvram_entry entry2;
+	fill_entry(&entry2, "TEST2", "def");
+	struct libnvram_entry entry3;
+	fill_entry(&entry3, "TEST3", "ghi");
+	struct libnvram_list *list = NULL;
+	int r = 1;
+
+	libnvram_list_set(&list, &entry1);
+	libnvram_list_set(&list, &entry2);
+	libnvram_list_set(&list, &entry3);
+
+	libnvram_list_it it = libnvram_list_begin(list);
+	const libnvram_list_it end = libnvram_list_end(list);
+	if (it == end)
+		goto error_exit;
+	if (libnvram_list_deref(it) != libnvram_list_get(list, (uint8_t*) "TEST1", 5))
+		goto error_exit;
+
+	it = libnvram_list_next(it);
+	if (it == end)
+		goto error_exit;
+	if (libnvram_list_deref(it) != libnvram_list_get(list, (uint8_t*) "TEST2", 5))
+		goto error_exit;
+
+	it = libnvram_list_next(it);
+	if (it == end)
+		goto error_exit;
+	if (libnvram_list_deref(it) != libnvram_list_get(list, (uint8_t*) "TEST3", 5))
+		goto error_exit;
+
+	it = libnvram_list_next(it);
+	if (it != end)
+		goto error_exit;
+
+	r = 0;
+error_exit:
+	destroy_libnvram_list(&list);
+	return r;
+}
+
 struct test test_array[] = {
 		ADD_TEST(test_libnvram_list_size_0),
 		ADD_TEST(test_libnvram_list_size_1),
@@ -307,5 +351,6 @@ struct test test_array[] = {
 		ADD_TEST(test_libnvram_list_remove_first),
 		ADD_TEST(test_libnvram_list_remove_second),
 		ADD_TEST(test_libnvram_list_remove_middle),
+		ADD_TEST(test_libnvram_list_iterate),
 		{NULL, NULL},
 };

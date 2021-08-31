@@ -90,6 +90,15 @@ struct libnvram_entry* libnvram_list_get(const struct libnvram_list* list, const
 int libnvram_list_remove(struct libnvram_list** list, const uint8_t* key, uint32_t key_len);
 
 /*
+ * Iterate over list. Always verify begin() != end().
+ */
+typedef struct libnvram_list* libnvram_list_it;
+libnvram_list_it libnvram_list_begin(const struct libnvram_list* list);
+libnvram_list_it libnvram_list_end(const struct libnvram_list* list);
+libnvram_list_it libnvram_list_next(const libnvram_list_it it);
+struct libnvram_entry* libnvram_list_deref(const libnvram_list_it it);
+
+/*
  * Destroy libnvram list
  */
 void destroy_libnvram_list(struct libnvram_list** list);
