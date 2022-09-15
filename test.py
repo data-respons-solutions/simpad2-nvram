@@ -37,17 +37,17 @@ class test_user_base(unittest.TestCase):
         self.tmpdir.cleanup()
         
     def nvram_set(self, key, val):
-        nvram(self.env, ['set', key, val], sys=self.sys)
+        nvram(self.env, ['--set', key, val], sys=self.sys)
         
     def nvram_get(self, key):
-        return nvram(self.env, ['get', key], sys=self.sys).rstrip()
+        return nvram(self.env, ['--get', key], sys=self.sys).rstrip()
     
     def nvram_list(self):
-        stdout = nvram(self.env, ['list'], sys=self.sys)
+        stdout = nvram(self.env, ['--list'], sys=self.sys)
         return dict(pair.split("=") for pair in stdout.split())
     
     def nvram_delete(self, key):
-        nvram(self.env, ['delete', key], sys=self.sys)
+        nvram(self.env, ['--del', key], sys=self.sys)
 
 class test_user_set_get(test_user_base):
     def test_set_get(self):

@@ -137,11 +137,17 @@ enum op {
 	OP_DEL,
 };
 
-struct opts {
-	int system_mode;
+struct operation {
 	enum op op;
 	char* key;
-	char* val;
+	char* value;
+};
+
+#define MAX_OP 10
+struct opts {
+	int system_mode;
+	int op_count;
+	struct operation operations[MAX_OP];
 };
 
 static void print_usage(const char* progname)
@@ -168,10 +174,10 @@ static void print_usage(const char* progname)
 	printf("\n");
 
 	printf("Commands:\n");
-	printf("  set         Write attribute. Requires KEY And VALUE\n");
-	printf("  get         Read attribute. Requires KEY\n");
-	printf("  delete      Delete attributes. Requires KEY\n");
-	printf("  list        Lists attributes\n");
+	printf("  --set       Write attribute. Requires KEY And VALUE\n");
+	printf("  --get       Read attribute. Requires KEY\n");
+	printf("  --del       Delete attributes. Requires KEY\n");
+	printf("  --list      Lists attributes\n");
 	printf("\n");
 
 	printf("Return values:\n");
@@ -361,92 +367,134 @@ static int add_list_entry(const char* list_name, struct libnvram_list** list, co
 int main(int argc, char** argv)
 {
 
-	struct opts opts = {0,OP_LIST,NULL,NULL};
+	struct opts opts;
+	memset(&opts, 0, sizeof(opts));
+
 	int r = 0;
 
 	if (get_env_long(NVRAM_ENV_DEBUG)) {
 		enable_debug();
 	}
 
-	if (argc > 5) {
-		fprintf(stderr, "Too many arguments\n");
-		return EINVAL;
-	}
-
-	for (int i = 0; i < argc; i++) {
-		if (!strcmp("set", argv[i])) {
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp("--set", argv[i])) {
 			if (i + 2 >= argc) {
 				fprintf(stderr, "Too few arguments for command set\n");
 				return EINVAL;
 			}
-			opts.op = OP_SET;
-			opts.key = argv[i + 1];
-			opts.val = argv[i + 2];
+			if (opts.op_count >= MAX_OP) {
+				fprintf(stderr, "Too many operations\n");
+				return EINVAL;
+			}
+			opts.operations[opts.op_count].op = OP_SET;
+			opts.operations[opts.op_count].key = argv[i + 1];
+			opts.operations[opts.op_count].value = argv[i + 2];
+			opts.op_count++;
 			i += 2;
-			break;
 		}
 		else
-		if (!strcmp("get", argv[i])) {
+		if (!strcmp("--get", argv[i])) {
 			if (++i >= argc) {
 				fprintf(stderr, "Too few arguments for command get\n");
 				return EINVAL;
 			}
-			opts.op = OP_GET;
-			opts.key = argv[i];
-			break;
+			if (opts.op_count >= MAX_OP) {
+				fprintf(stderr, "Too many operations\n");
+				return EINVAL;
+			}
+			opts.operations[opts.op_count].op = OP_GET;
+			opts.operations[opts.op_count].key = argv[i];
+			opts.op_count++;
 		}
 		else
-		if (!strcmp("list", argv[i])) {
-			opts.op = OP_LIST;
+		if (!strcmp("--list", argv[i])) {
+			if (opts.op_count >= MAX_OP) {
+				fprintf(stderr, "Too many operations\n");
+				return EINVAL;
+			}
+			opts.operations[opts.op_count].op = OP_LIST;
+			opts.op_count++;
 		}
 		else
-		if(!strcmp("delete", argv[i])) {
+		if(!strcmp("--del", argv[i])) {
 			if (++i >= argc) {
 				fprintf(stderr, "Too few arguments for command delete\n");
 				return EINVAL;
 			}
-			opts.op = OP_DEL;
-			opts.key = argv[i];
-			break;
+			if (opts.op_count >= MAX_OP) {
+				fprintf(stderr, "Too many operations\n");
+				return EINVAL;
+			}
+			opts.operations[opts.op_count].op = OP_DEL;
+			opts.operations[opts.op_count].key = argv[i];
+			opts.op_count++;
 		}
 		else
 		if (!strcmp("--sys", argv[i])) {
 			opts.system_mode = 1;
 		}
 		else
-		if (!strcmp("--help", argv[i])) {
+		if (!strcmp("-h", argv[i]) || !strcmp("--help", argv[i])) {
 			print_usage(NVRAM_PROGRAM_NAME);
-			return 0;
+			return 1;
+		}
+		else {
+			fprintf(stderr, "unknown argument: %s\n", argv[i]);
+			return 1;
 		}
 	}
 
-	pr_dbg("operation: %d, key: %s, val: %s, system_mode: %d\n", opts.op, opts.key, opts.val, opts.system_mode);
+	if (opts.op_count == 0) {
+		opts.operations[0].op = OP_LIST;
+		opts.op_count++;
+	}
 
-	if (opts.system_mode) {
-		switch (opts.op) {
+	int read_ops = 0;
+	int write_ops = 0;
+	pr_dbg("system_mode: %d\n", opts.system_mode);
+	for (int i = 0; i < opts.op_count; ++i) {
+		pr_dbg("operation: %d, key: %s, val: %s\n",
+				opts.operations[i].op, opts.operations[i].key, opts.operations[i].value);
+		switch (opts.operations[i].op) {
 		case OP_SET:
-			if (!starts_with(opts.key, NVRAM_SYSTEM_PREFIX)) {
-				pr_err("required prefix \"%s\" missing in system attribute\n", NVRAM_SYSTEM_PREFIX);
-				return EINVAL;
+			if (opts.system_mode) {
+				if (!starts_with(opts.operations[i].key, NVRAM_SYSTEM_PREFIX)) {
+					pr_err("required prefix \"%s\" missing in system attribute\n", NVRAM_SYSTEM_PREFIX);
+					return EINVAL;
+				}
+				if (!system_unlocked()) {
+					pr_err("system write locked\n")
+					return EACCES;
+				}
 			}
-			//FALLTHROUGH
+			if (!opts.system_mode) {
+				if (starts_with(opts.operations[i].key, NVRAM_SYSTEM_PREFIX)) {
+					pr_err("forbidden prefix \"%s\" in user attribute\n", NVRAM_SYSTEM_PREFIX);
+					return EINVAL;
+				}
+			}
+			write_ops++;
+			break;
 		case OP_DEL:
-			if (!system_unlocked()) {
+			if (opts.system_mode && !system_unlocked()) {
 				pr_err("system write locked\n")
 				return EACCES;
 			}
+			write_ops++;
 			break;
-		default:
+		case OP_LIST:
+		case OP_GET:
+			read_ops++;
 			break;
 		}
 	}
-	else {
-		if (opts.op == OP_SET) {
-			if (starts_with(opts.key, NVRAM_SYSTEM_PREFIX)) {
-				pr_err("forbidden prefix \"%s\" in user attribute\n", NVRAM_SYSTEM_PREFIX);
-				return EINVAL;
-			}
-		}
+	if (read_ops > 0 && write_ops > 0) {
+		pr_err("can't mix read and write operations\n");
+		return EINVAL;
+	}
+	if (read_ops > 1) {
+		pr_err("maximum single read operation supported\n");
+		return EINVAL;
 	}
 
 	struct nvram *nvram_system = NULL;
@@ -479,47 +527,51 @@ int main(int argc, char** argv)
 		}
 	}
 
-	switch (opts.op) {
-	case OP_LIST:
+	int write_performed = 0;
+	if (opts.operations[0].op == OP_LIST) {
 		print_list("system", list_system);
 		if (!opts.system_mode) {
 			print_list("user", list_user);
 		}
-		break;
-	case OP_GET:
-		r = print_list_entry("system", list_system, opts.key);
+	}
+	else
+	if (opts.operations[0].op == OP_GET) {
+		r = print_list_entry("system", list_system, opts.operations[0].key);
 		if (r && !opts.system_mode) {
-			r = print_list_entry("user", list_user, opts.key);
+			r = print_list_entry("user", list_user, opts.operations[0].key);
 		}
 		if (r) {
-			pr_dbg("key not found: %s\n", opts.key);
+			pr_dbg("key not found: %s\n", opts.operations[0].key);
 			r = -ENOENT;
 			goto exit;
 		}
-		break;
-	case OP_SET:
-		r = add_list_entry(opts.system_mode ? "system" : "user", opts.system_mode ? &list_system : &list_user, opts.key, opts.val);
-		switch (r) {
-		case 0:
-			break;
-		case 1:
-			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? list_system : list_user);
-			if (r) {
-				goto exit;
+	}
+	else {
+		for (int i = 0; i < opts.op_count; ++i) {
+			if (opts.operations[i].op == OP_SET) {
+				pr_dbg("HEre: %d: op_count: %d\n", i, opts.op_count);
+				r = add_list_entry(opts.system_mode ? "system" : "user", opts.system_mode ? &list_system : &list_user, opts.operations[i].key, opts.operations[i].value);
+				if (r < 0)
+					goto exit;
+				if (r == 1) {
+					pr_dbg("written\n");
+					write_performed = 1;
+				}
 			}
-		default:
+			if (opts.operations[i].op == OP_DEL) {
+				pr_dbg("deleting %s: %s\n", opts.system_mode ? "system" : "user", opts.operations[i].key);
+				if(libnvram_list_remove(opts.system_mode ? &list_system : &list_user, (uint8_t*) opts.operations[i].key, strlen(opts.operations[i].key) + 1))
+					write_performed = 1;
+			}
+		}
+	}
+
+	if (write_performed) {
+		pr_dbg("Commit changes\n");
+		r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? list_system : list_user);
+		if (r) {
 			goto exit;
 		}
-		break;
-	case OP_DEL:
-		pr_dbg("deleting %s: %s\n", opts.system_mode ? "system" : "user", opts.key);
-		if(libnvram_list_remove(opts.system_mode ? &list_system : &list_user, (uint8_t*) opts.key, strlen(opts.key) + 1)) {
-			r = nvram_commit(opts.system_mode ? nvram_system : nvram_user, opts.system_mode ? list_system : list_user);
-			if (r) {
-				goto exit;
-			}
-		}
-		break;
 	}
 
 	r = 0;
