@@ -1,3 +1,0 @@
-[submodule "libnvram"]
-	path = libnvram
-	url = ssh://git@github.com/data-respons-solutions/libnvram.git
